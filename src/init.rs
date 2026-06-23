@@ -13,7 +13,10 @@ esac
 if [ "$JAVA_HOME" != "$__jvm_current" ]; then
     export JAVA_HOME="$__jvm_current"
 fi
-hash -r 2>/dev/null || true"#
+hash -r 2>/dev/null || true
+# Usage:
+#   Add the following to your ~/.bashrc:
+#       eval "$(jvm init bash)"#
     .to_string()
 }
 
@@ -32,7 +35,10 @@ esac
 if [ "$JAVA_HOME" != "$__jvm_current" ]; then
     export JAVA_HOME="$__jvm_current"
 fi
-hash -r 2>/dev/null || true"#
+hash -r 2>/dev/null || true
+# Usage:
+#   Add the following to your ~/.zshrc:
+#       eval "$(jvm init zsh)"#
     .to_string()
 }
 
@@ -53,7 +59,37 @@ if not contains "$__jvm_current/bin" $PATH
 end
 if test "$JAVA_HOME" != "$__jvm_current"
     set -x JAVA_HOME "$__jvm_current"
-end"#
+end
+# Usage:
+#   Add the following to your config.fish:
+#       jvm init fish | source"#
+    .to_string()
+}
+
+pub fn generate_powershell_hook() -> String {
+    r#"if ($env:JVM_DIR) {
+    $__jvm_current = Join-Path $env:JVM_DIR "current"
+} elseif ($env:XDG_RUNTIME_DIR) {
+    $__jvm_current = Join-Path $env:XDG_RUNTIME_DIR "jvm" "current"
+} else {
+    $__jvm_current = Join-Path $HOME ".config" "jvm" "current"
+}
+
+$__jvm_bin = Join-Path $__jvm_current "bin"
+if ($env:PATH -notlike "*$__jvm_bin*") {
+    $env:PATH = "$__jvm_bin;$env:PATH"
+}
+
+if ($env:JAVA_HOME -ne $__jvm_current) {
+    $env:JAVA_HOME = $__jvm_current
+}
+
+<#
+Usage:
+  Add the following to your PowerShell profile ($PROFILE):
+
+      jvm init powershell | Out-String | Invoke-Expression
+#>"#
     .to_string()
 }
 
@@ -62,6 +98,7 @@ pub fn generate_hook(shell: &str) -> Result<String, String> {
         "bash" => Ok(generate_bash_hook()),
         "zsh" => Ok(generate_zsh_hook()),
         "fish" => Ok(generate_fish_hook()),
+        "powershell" => Ok(generate_powershell_hook()),
         other => Err(format!("unsupported shell type: {}", other)),
     }
 }
