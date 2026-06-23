@@ -30,7 +30,6 @@ pub fn switch_version(version: &str) -> Result<()> {
     }
 
     println!("Switched to JDK {} ({})", entry.full_version, entry.path);
-    println!("Run 'hash -r' (bash) or 'rehash' (zsh) to update command cache in the current shell.");
     Ok(())
 }
 
