@@ -3,6 +3,7 @@ use std::fs;
 use anyhow::{Context, Result};
 
 use crate::config::Config;
+use crate::dirs;
 
 pub fn switch_version(version: &str) -> Result<()> {
     let mut config = Config::load()?;
@@ -15,13 +16,11 @@ pub fn switch_version(version: &str) -> Result<()> {
     config.current = Some(entry.full_version.clone());
     config.save()?;
 
-    let jvm_dir = dirs::home_dir()
-        .context("cannot get $HOME directory")?
-        .join(".config").join("jvm");
-    fs::create_dir_all(&jvm_dir)
-        .with_context(|| format!("failed to create directory: {}", jvm_dir.display()))?;
+    let runtime_dir = dirs::runtime_dir();
+    fs::create_dir_all(&runtime_dir)
+        .with_context(|| format!("failed to create directory: {}", runtime_dir.display()))?;
 
-    let current_link = jvm_dir.join("current");
+    let current_link = dirs::current_link_path();
     let _ = fs::remove_file(&current_link);
 
     #[cfg(unix)]
@@ -31,6 +30,7 @@ pub fn switch_version(version: &str) -> Result<()> {
     }
 
     println!("Switched to JDK {} ({})", entry.full_version, entry.path);
+    println!("Run 'hash -r' (bash) or 'rehash' (zsh) to update command cache in the current shell.");
     Ok(())
 }
 

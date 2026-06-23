@@ -84,6 +84,13 @@ Custom aliases can be added via the `--alias` flag during `jvm add`.
 
 ## How It Works
 
-- JDK metadata is stored in `~/.config/jvm/config.json`
-- `jvm use` creates a symlink `~/.config/jvm/current` pointing to the target JDK
+### Directory Layout (XDG Base Directory Specification)
+
+| Purpose | Path | Controlled By |
+|---------|------|---------------|
+| Configuration (JDK metadata) | `${XDG_CONFIG_HOME:-$HOME/.config}/jvm/config.json` | `JVM_DIR` / `XDG_CONFIG_HOME` |
+| Runtime (current symlink) | `${XDG_RUNTIME_DIR:-...}/jvm/current` | `JVM_DIR` / `XDG_RUNTIME_DIR` |
+
+- `$JVM_DIR` overrides all paths (backwards-compatible); when unset, paths follow XDG specs
+- The `current` symlink is created in `$XDG_RUNTIME_DIR/jvm/` (e.g. `/run/user/$UID/jvm/current`), falling back to the config directory when `$XDG_RUNTIME_DIR` is not set
 - The shell hook reads this symlink and sets `JAVA_HOME` and `PATH`

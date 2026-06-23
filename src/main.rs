@@ -1,4 +1,5 @@
 mod config;
+mod dirs;
 mod init;
 mod jdk;
 mod switch;

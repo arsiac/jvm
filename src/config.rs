@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::dirs;
 use crate::jdk::JdkInfo;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -22,9 +23,7 @@ pub struct Config {
 
 impl Config {
     pub fn path() -> Result<PathBuf> {
-        let home = dirs::home_dir().context("cannot get $HOME directory")?;
-        let dir = home.join(".config").join("jvm");
-        Ok(dir.join("config.json"))
+        Ok(dirs::config_dir().join("config.json"))
     }
 
     pub fn load() -> Result<Self> {
