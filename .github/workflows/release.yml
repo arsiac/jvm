@@ -59,7 +59,11 @@ jobs:
           mkdir -p dist
           cp "target/${{ matrix.target }}/release/$BINARY" dist/
           cd dist
-          zip -r "../${{ env.BINARY_NAME }}-${VERSION}-${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}.zip" "$BINARY"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a "../${{ env.BINARY_NAME }}-${VERSION}-${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}.zip" "$BINARY"
+          else
+            zip -r "../${{ env.BINARY_NAME }}-${VERSION}-${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}.zip" "$BINARY"
+          fi
         working-directory: ${{ github.workspace }}
 
       - uses: softprops/action-gh-release@v3
