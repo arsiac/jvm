@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  BINARY_NAME: jvm
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_os: linux
+            artifact_arch: amd64
+            ext: ""
+          - os: macos-13
+            target: x86_64-apple-darwin
+            artifact_os: macos
+            artifact_arch: amd64
+            ext: ""
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_os: macos
+            artifact_arch: aarch64
+            ext: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_os: windows
+            artifact_arch: amd64
+            ext: ".exe"
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+
+      - run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package artifact
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          BINARY="${{ env.BINARY_NAME }}${{ matrix.ext }}"
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            strip "target/${{ matrix.target }}/release/$BINARY"
+          fi
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/$BINARY" dist/
+          cd dist
+          zip -r "../${{ env.BINARY_NAME }}-${VERSION}-${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}.zip" "$BINARY"
+        working-directory: ${{ github.workspace }}
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.BINARY_NAME }}-*.zip
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
