@@ -11,6 +11,8 @@ env:
 jobs:
   build:
     name: Build ${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}
+    permissions:
+      contents: write
     strategy:
       matrix:
         include:
@@ -24,7 +26,7 @@ jobs:
             artifact_os: macos
             artifact_arch: amd64
             ext: ""
-          - os: macos-latest
+          - os: macos-25
             target: aarch64-apple-darwin
             artifact_os: macos
             artifact_arch: aarch64
@@ -37,7 +39,7 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -60,7 +62,7 @@ jobs:
           zip -r "../${{ env.BINARY_NAME }}-${VERSION}-${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}.zip" "$BINARY"
         working-directory: ${{ github.workspace }}
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: ${{ env.BINARY_NAME }}-*.zip
           name: Release ${{ github.ref_name }}
