@@ -71,13 +71,17 @@ pub fn generate_powershell_hook() -> String {
     $__jvm_current = Join-Path $env:JVM_DIR "current"
 } elseif ($env:XDG_RUNTIME_DIR) {
     $__jvm_current = Join-Path $env:XDG_RUNTIME_DIR "jvm" "current"
+} elseif (($env:OS -eq 'Windows_NT') -and $env:LOCALAPPDATA) {
+    $__jvm_current = Join-Path $env:LOCALAPPDATA "jvm" "current"
 } else {
-    $__jvm_current = Join-Path $HOME ".config" "jvm" "current"
+    $__home = if ($HOME) { $HOME } else { $env:USERPROFILE }
+    $__jvm_current = Join-Path $__home ".config" "jvm" "current"
 }
 
+$__sep = [System.IO.Path]::PathSeparator
 $__jvm_bin = Join-Path $__jvm_current "bin"
-if ($env:PATH -notlike "*$__jvm_bin*") {
-    $env:PATH = "$__jvm_bin;$env:PATH"
+if ($env:PATH -split $__sep -notcontains $__jvm_bin) {
+    $env:PATH = "$__jvm_bin$__sep$env:PATH"
 }
 
 if ($env:JAVA_HOME -ne $__jvm_current) {
