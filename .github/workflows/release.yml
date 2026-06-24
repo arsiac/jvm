@@ -21,12 +21,17 @@ jobs:
             artifact_os: linux
             artifact_arch: amd64
             ext: ""
-          - os: macos-13
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            artifact_os: linux
+            artifact_arch: arm64
+            ext: ""
+          - os: macos-15-intel
             target: x86_64-apple-darwin
             artifact_os: macos
             artifact_arch: amd64
             ext: ""
-          - os: macos-25
+          - os: macos-15
             target: aarch64-apple-darwin
             artifact_os: macos
             artifact_arch: aarch64
@@ -35,6 +40,11 @@ jobs:
             target: x86_64-pc-windows-msvc
             artifact_os: windows
             artifact_arch: amd64
+            ext: ".exe"
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            artifact_os: windows
+            artifact_arch: arm64
             ext: ".exe"
 
     runs-on: ${{ matrix.os }}
