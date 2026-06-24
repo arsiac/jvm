@@ -45,6 +45,9 @@ enum Commands {
         shell: String,
     },
 
+    /// Show the currently active JDK version
+    Current,
+
     /// Remove a registered JDK
     #[command(alias = "rm")]
     Remove {
@@ -82,6 +85,16 @@ fn cmd_add(path: &str, custom_aliases: &[String]) -> Result<()> {
     config.save()?;
 
     println!("Added JDK {} ({})", full_version, jdk_path.display());
+    Ok(())
+}
+
+fn cmd_current() -> Result<()> {
+    let config = config::Config::load()?;
+    match config.current {
+        Some(v) => println!("{}", v),
+        None if config.jdks.is_empty() => println!("No JDK has been added yet"),
+        None => println!("No JDK is currently active"),
+    }
     Ok(())
 }
 
@@ -185,6 +198,7 @@ fn main() -> Result<()> {
         Commands::Use { version } => cmd_use(&version)?,
         Commands::List => cmd_list()?,
         Commands::Init { shell } => cmd_init(&shell)?,
+        Commands::Current => cmd_current()?,
         Commands::Remove { target } => cmd_remove(&target)?,
     }
 
