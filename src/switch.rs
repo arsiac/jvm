@@ -1,3 +1,4 @@
+use std::env;
 use std::fs;
 
 use anyhow::{Context, Result};
@@ -30,6 +31,26 @@ pub fn switch_version(version: &str) -> Result<()> {
     }
 
     println!("Switched to JDK {} ({})", entry.full_version, entry.path);
+
+    let current_bin = dirs::current_link_path().join("bin");
+    let current_bin_str = current_bin.to_string_lossy().to_string();
+    let already_in_path = env::var("PATH")
+        .map(|p| p.split(':').any(|x| x == current_bin_str))
+        .unwrap_or(false);
+
+    if !already_in_path {
+        let hint = match env::var("SHELL").as_deref() {
+            Ok(s) if s.ends_with("bash") => "eval \"$(jvm init bash)\"",
+            Ok(s) if s.ends_with("zsh") => "eval \"$(jvm init zsh)\"",
+            Ok(s) if s.ends_with("fish") => "jvm init fish | source",
+            Ok(s) if s.contains("powershell") || s.contains("pwsh") => {
+                "jvm init powershell | Out-String | Invoke-Expression"
+            }
+            _ => "restart your shell",
+        };
+        println!("\nRun '{}' to update your current shell environment.", hint);
+    }
+
     Ok(())
 }
 
