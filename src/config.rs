@@ -100,9 +100,14 @@ impl Config {
         Ok(true)
     }
 
-    pub fn find_by_version(&self, version: &str) -> Option<&JdkEntry> {
+    pub fn find_by_version(&self, target: &str) -> Option<&JdkEntry> {
         for entry in &self.jdks {
-            if entry.full_version == version || entry.aliases.contains(&version.to_string()) {
+            if entry.full_version == target || entry.aliases.contains(&target.to_string()) {
+                return Some(entry);
+            }
+        }
+        for entry in &self.jdks {
+            if entry.path == target || entry.path.ends_with(target) {
                 return Some(entry);
             }
         }
