@@ -8,6 +8,8 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use comfy_table::presets;
+use comfy_table::*;
 
 use crate::jdk::JdkInfo;
 
@@ -110,68 +112,35 @@ fn cmd_list() -> Result<()> {
         return Ok(());
     }
 
-    let marker_width = 3;
-    let path_header = "Path";
-    let version_header = "Version";
-    let alias_header = "Aliases";
-
-    let path_width = config
-        .jdks
-        .iter()
-        .map(|e| e.path.len())
-        .max()
-        .unwrap_or(0)
-        .max(path_header.len())
-        + 2;
-
-    let version_width = config
-        .jdks
-        .iter()
-        .map(|e| e.full_version.len())
-        .max()
-        .unwrap_or(0)
-        .max(version_header.len())
-        + 2;
-
-    println!(
-        "  {:marker$}{:<width_path$} {:<width_ver$} {}",
-        "",
-        path_header,
-        version_header,
-        alias_header,
-        marker = marker_width,
-        width_path = path_width,
-        width_ver = version_width
-    );
-    println!(
-        "  {:marker$}{:-<width_path$} {:-<width_ver$} {}",
-        "---",
-        "",
-        "",
-        "---",
-        marker = marker_width,
-        width_path = path_width,
-        width_ver = version_width
-    );
+    let mut table = Table::new();
+    table.load_preset(presets::NOTHING);
+    table.set_header(vec![
+        Cell::new("").add_attribute(Attribute::Bold),
+        Cell::new("Path").add_attribute(Attribute::Bold),
+        Cell::new("Version").add_attribute(Attribute::Bold),
+        Cell::new("Aliases").add_attribute(Attribute::Bold),
+    ]);
 
     for entry in &config.jdks {
-        let current_mark = if Some(&entry.full_version) == config.current.as_ref() {
-            "*"
+        let is_current = Some(&entry.full_version) == config.current.as_ref();
+        let marker = if is_current { "*" } else { "" };
+        let version = if is_current {
+            Cell::new(&entry.full_version)
+                .fg(Color::Green)
+                .add_attribute(Attribute::Bold)
         } else {
-            ""
+            Cell::new(&entry.full_version)
         };
-        println!(
-            "  {:marker$}{:<width_path$} {:<width_ver$} {}",
-            current_mark,
-            entry.path,
-            entry.full_version,
-            entry.aliases.join(", "),
-            marker = marker_width,
-            width_path = path_width,
-            width_ver = version_width
-        );
+
+        table.add_row(vec![
+            Cell::new(marker),
+            Cell::new(&entry.path),
+            version,
+            Cell::new(&entry.aliases.join(", ")),
+        ]);
     }
 
+    println!("{}", table);
     Ok(())
 }
 
