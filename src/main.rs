@@ -65,6 +65,29 @@ enum Commands {
         #[arg(long)]
         all: bool,
     },
+
+    /// Manage JDK aliases
+    #[command(subcommand)]
+    Alias(AliasCommands),
+}
+
+#[derive(Subcommand)]
+enum AliasCommands {
+    /// Add an alias to a JDK
+    Add {
+        /// JDK version, alias, or path
+        target: String,
+        /// Alias to add
+        alias: String,
+    },
+    /// Remove an alias from a JDK
+    #[command(alias = "rm")]
+    Remove {
+        /// JDK version, alias, or path
+        target: String,
+        /// Alias to remove
+        alias: String,
+    },
 }
 
 fn cmd_add(path: &str, custom_aliases: &[String]) -> Result<()> {
@@ -158,6 +181,22 @@ fn cmd_remove(target: &str) -> Result<()> {
     config.remove_jdk(target)?;
     config.save()?;
     println!("Removed JDK: {}", target);
+    Ok(())
+}
+
+fn cmd_alias_add(target: &str, alias: &str) -> Result<()> {
+    let mut config = config::Config::load()?;
+    let version = config.add_alias(target, alias)?;
+    config.save()?;
+    println!("Added alias '{}' to JDK {}", alias, version);
+    Ok(())
+}
+
+fn cmd_alias_remove(target: &str, alias: &str) -> Result<()> {
+    let mut config = config::Config::load()?;
+    let version = config.del_alias(target, alias)?;
+    config.save()?;
+    println!("Removed alias '{}' from JDK {}", alias, version);
     Ok(())
 }
 
@@ -269,6 +308,10 @@ fn main() -> Result<()> {
         Commands::Current => cmd_current()?,
         Commands::Remove { target } => cmd_remove(&target)?,
         Commands::Update { target, all } => cmd_update(&target, all)?,
+        Commands::Alias(cmd) => match cmd {
+            AliasCommands::Add { target, alias } => cmd_alias_add(&target, &alias)?,
+            AliasCommands::Remove { target, alias } => cmd_alias_remove(&target, &alias)?,
+        },
     }
 
     Ok(())

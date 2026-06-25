@@ -129,4 +129,54 @@ impl Config {
         self.jdks.remove(pos);
         Ok(())
     }
+
+    pub fn add_alias(&mut self, target: &str, new_alias: &str) -> Result<String> {
+        let idx = self.jdks.iter().position(|e| {
+            e.full_version == target
+                || e.aliases.contains(&target.to_string())
+                || e.path == target
+                || e.path.ends_with(target)
+        }).ok_or_else(|| anyhow::anyhow!("no JDK found matching: {}", target))?;
+
+        let entry_path = self.jdks[idx].path.clone();
+        let entry_version = self.jdks[idx].full_version.clone();
+
+        if self.jdks[idx].aliases.contains(&new_alias.to_string()) {
+            anyhow::bail!("alias '{}' already exists for JDK {}", new_alias, entry_version);
+        }
+
+        for other in &self.jdks {
+            if other.path == entry_path { continue; }
+            if other.full_version == new_alias || other.aliases.contains(&new_alias.to_string()) {
+                anyhow::bail!("alias '{}' is already used by JDK {} ({})",
+                    new_alias, other.full_version, other.path);
+            }
+        }
+
+        self.jdks[idx].aliases.push(new_alias.to_string());
+        self.jdks[idx].aliases.sort();
+        Ok(entry_version)
+    }
+
+    pub fn del_alias(&mut self, target: &str, alias: &str) -> Result<String> {
+        let entry = self.jdks.iter_mut()
+            .find(|e| {
+                e.full_version == target
+                    || e.aliases.contains(&target.to_string())
+                    || e.path == target
+                    || e.path.ends_with(target)
+            })
+            .ok_or_else(|| anyhow::anyhow!("no JDK found matching: {}", target))?;
+
+        if alias == entry.full_version {
+            anyhow::bail!("cannot remove the primary version identifier '{}'", alias);
+        }
+
+        if !entry.aliases.contains(&alias.to_string()) {
+            anyhow::bail!("alias '{}' not found for JDK {}", alias, entry.full_version);
+        }
+
+        entry.aliases.retain(|a| a != alias);
+        Ok(entry.full_version.clone())
+    }
 }
