@@ -56,6 +56,15 @@ enum Commands {
         /// Version number, alias, or path of the JDK to remove
         target: String,
     },
+
+    /// Update JDK metadata after system upgrade
+    Update {
+        /// JDK to update (version or alias)
+        target: Option<String>,
+        /// Update all registered JDKs
+        #[arg(long)]
+        all: bool,
+    },
 }
 
 fn cmd_add(path: &str, custom_aliases: &[String]) -> Result<()> {
@@ -159,6 +168,96 @@ fn cmd_init(shell: &str) -> Result<()> {
     Ok(())
 }
 
+fn cmd_update(target: &Option<String>, all: bool) -> Result<()> {
+    match (target, all) {
+        (Some(_), true) => anyhow::bail!("Cannot specify both a JDK target and --all"),
+        (Some(target), false) => {
+            let mut config = config::Config::load()?;
+            let idx = config.jdks.iter().position(|e| {
+                e.full_version == *target
+                    || e.aliases.contains(target)
+            }).ok_or_else(|| anyhow::anyhow!("no JDK found matching: {}", target))?;
+            update_single_entry(&mut config, idx)?;
+            config.save()?;
+        }
+        (None, true) => {
+            let mut config = config::Config::load()?;
+            let count = config.jdks.len();
+            let mut updated = 0;
+            for idx in 0..count {
+                if let Err(e) = update_single_entry(&mut config, idx) {
+                    eprintln!("Warning: {}", e);
+                } else {
+                    updated += 1;
+                }
+            }
+            if updated > 0 {
+                config.save()?;
+            }
+            match updated {
+                0 => println!("No JDK entries needed updating"),
+                _ => println!("Updated {} JDK entr{}", updated, if updated == 1 { "y" } else { "ies" }),
+            }
+        }
+        (None, false) => anyhow::bail!("Please specify a JDK to update, or use --all"),
+    }
+    Ok(())
+}
+
+fn update_single_entry(config: &mut config::Config, idx: usize) -> Result<()> {
+    let entry = &config.jdks[idx];
+    let jdk_path = Path::new(&entry.path);
+
+    if !jdk_path.exists() {
+        anyhow::bail!("path no longer exists: {}", entry.path);
+    }
+    if !jdk_path.join("bin").join("java").exists() {
+        anyhow::bail!("not a valid JDK directory (bin/java not found): {}", entry.path);
+    }
+
+    let new_version = jdk::detect_version(jdk_path)
+        .with_context(|| format!("cannot detect JDK version for {}", entry.path))?;
+
+    if new_version == entry.full_version {
+        println!("JDK {} is already up to date", entry.full_version);
+        return Ok(());
+    }
+
+    let old_auto = jdk::generate_aliases(&entry.full_version);
+    let custom_aliases: Vec<String> = entry.aliases.iter()
+        .filter(|a| !old_auto.contains(a))
+        .cloned()
+        .collect();
+
+    let mut new_aliases = jdk::generate_aliases(&new_version);
+    for alias in &custom_aliases {
+        if !new_aliases.contains(alias) {
+            new_aliases.push(alias.clone());
+        }
+    }
+
+    for (i, other) in config.jdks.iter().enumerate() {
+        if i == idx { continue; }
+        for alias in &new_aliases {
+            if other.aliases.contains(alias) || other.full_version == *alias {
+                eprintln!("Warning: alias '{}' is also used by JDK {} ({})",
+                    alias, other.full_version, other.path);
+            }
+        }
+    }
+
+    let old_version = config.jdks[idx].full_version.clone();
+    config.jdks[idx].full_version = new_version.clone();
+    config.jdks[idx].aliases = new_aliases;
+
+    if config.current.as_deref() == Some(&old_version) {
+        config.current = Some(new_version);
+    }
+
+    println!("Updated JDK: {} → {} ({})", old_version, config.jdks[idx].full_version, config.jdks[idx].path);
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -169,6 +268,7 @@ fn main() -> Result<()> {
         Commands::Init { shell } => cmd_init(&shell)?,
         Commands::Current => cmd_current()?,
         Commands::Remove { target } => cmd_remove(&target)?,
+        Commands::Update { target, all } => cmd_update(&target, all)?,
     }
 
     Ok(())
