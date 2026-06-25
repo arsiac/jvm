@@ -51,7 +51,7 @@ enum Commands {
     Current,
 
     /// Remove a registered JDK
-    #[command(alias = "rm")]
+    #[command(visible_alias = "rm")]
     Remove {
         /// Version number, alias, or path of the JDK to remove
         target: String,
@@ -81,7 +81,7 @@ enum AliasCommands {
         alias: String,
     },
     /// Remove an alias from a JDK
-    #[command(alias = "rm")]
+    #[command(visible_alias = "rm")]
     Remove {
         /// JDK version, alias, or path
         target: String,
