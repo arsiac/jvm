@@ -4,7 +4,9 @@ mod init;
 mod jdk;
 mod switch;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(windows)]
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -91,17 +93,18 @@ enum AliasCommands {
 }
 
 fn cmd_add(path: &str, custom_aliases: &[String]) -> Result<()> {
-    let mut jdk_path = Path::new(path).canonicalize()
+    let jdk_path = Path::new(path).canonicalize()
         .with_context(|| format!("cannot access path: {}", path))?;
 
-    // Strip \\?\ prefix on Windows for cleaner display
     #[cfg(windows)]
-    {
+    let jdk_path = {
         let path_str = jdk_path.to_string_lossy().to_string();
         if let Some(stripped) = path_str.strip_prefix(r"\\?\") {
-            jdk_path = PathBuf::from(stripped);
+            PathBuf::from(stripped)
+        } else {
+            jdk_path
         }
-    }
+    };
 
     if !jdk::java_bin_path(&jdk_path).exists() {
         anyhow::bail!("{} is not a valid JDK directory (bin/java not found)", jdk_path.display());
@@ -177,7 +180,7 @@ fn cmd_list() -> Result<()> {
             Cell::new(marker),
             Cell::new(dirs::display_path(entry.path.as_ref())),
             version,
-            Cell::new(&entry.aliases.join(", ")),
+            Cell::new(entry.aliases.join(", ")),
         ]);
     }
 
@@ -259,7 +262,7 @@ fn update_single_entry(config: &mut config::Config, idx: usize) -> Result<()> {
     if !jdk_path.exists() {
         anyhow::bail!("path no longer exists: {}", dirs::display_path(entry.path.as_ref()));
     }
-    if !jdk::java_bin_path(&jdk_path).exists() {
+    if !jdk::java_bin_path(jdk_path).exists() {
         anyhow::bail!("not a valid JDK directory (bin/java not found): {}", dirs::display_path(entry.path.as_ref()));
     }
 

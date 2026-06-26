@@ -106,12 +106,7 @@ impl Config {
                 return Some(entry);
             }
         }
-        for entry in &self.jdks {
-            if entry.path == target || entry.path.ends_with(target) {
-                return Some(entry);
-            }
-        }
-        None
+        self.jdks.iter().find(|entry| entry.path == target || entry.path.ends_with(target))
     }
 
     pub fn remove_jdk(&mut self, version_or_path: &str) -> Result<()> {
