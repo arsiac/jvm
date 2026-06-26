@@ -92,7 +92,7 @@ pub fn switch_version(version: &str) -> Result<()> {
 
     // Symlink is ready; now persist the config
     config.current = Some(entry.full_version.clone());
-    if let Err(e) = config.save() {
+    config.save().inspect_err(|_| {
         // Config persistence failed – roll back the symlink
         #[cfg(unix)]
         if let Some(old) = old_target {
@@ -101,8 +101,7 @@ pub fn switch_version(version: &str) -> Result<()> {
                 let _ = fs::rename(&rollback_tmp, &current_link);
             }
         }
-        return Err(e);
-    }
+    })?;
 
     println!(
         "Switched to JDK {} ({})",
