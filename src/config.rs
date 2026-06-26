@@ -52,8 +52,13 @@ impl Config {
         let tmp_path = PathBuf::from(format!("{}.tmp", path.display()));
         fs::write(&tmp_path, &content)
             .with_context(|| format!("failed to write config: {}", tmp_path.display()))?;
-        fs::rename(&tmp_path, &path)
-            .with_context(|| format!("failed to rename config: {} -> {}", tmp_path.display(), path.display()))?;
+        fs::rename(&tmp_path, &path).with_context(|| {
+            format!(
+                "failed to rename config: {} -> {}",
+                tmp_path.display(),
+                path.display()
+            )
+        })?;
         Ok(())
     }
 
@@ -109,19 +114,28 @@ impl Config {
                 return Some(entry);
             }
         }
-        self.jdks.iter().find(|entry| entry.path == target || entry.path.ends_with(target))
+        self.jdks
+            .iter()
+            .find(|entry| entry.path == target || entry.path.ends_with(target))
     }
 
     pub fn remove_jdk(&mut self, version_or_path: &str) -> Result<()> {
-        let pos = self.jdks.iter().position(|e| {
-            e.full_version == version_or_path
-                || e.aliases.contains(&version_or_path.to_string())
-                || e.path == version_or_path
-        }).ok_or_else(|| anyhow::anyhow!("no JDK found matching: {}", version_or_path))?;
+        let pos = self
+            .jdks
+            .iter()
+            .position(|e| {
+                e.full_version == version_or_path
+                    || e.aliases.contains(&version_or_path.to_string())
+                    || e.path == version_or_path
+            })
+            .ok_or_else(|| anyhow::anyhow!("no JDK found matching: {}", version_or_path))?;
 
         let entry = &self.jdks[pos];
         if self.current.as_deref() == Some(&entry.full_version) {
-            anyhow::bail!("JDK {} is currently in use, switch to another version first", entry.full_version);
+            anyhow::bail!(
+                "JDK {} is currently in use, switch to another version first",
+                entry.full_version
+            );
         }
 
         self.jdks.remove(pos);
@@ -129,25 +143,39 @@ impl Config {
     }
 
     pub fn add_alias(&mut self, target: &str, new_alias: &str) -> Result<String> {
-        let idx = self.jdks.iter().position(|e| {
-            e.full_version == target
-                || e.aliases.contains(&target.to_string())
-                || e.path == target
-                || e.path.ends_with(target)
-        }).ok_or_else(|| anyhow::anyhow!("no JDK found matching: {}", target))?;
+        let idx = self
+            .jdks
+            .iter()
+            .position(|e| {
+                e.full_version == target
+                    || e.aliases.contains(&target.to_string())
+                    || e.path == target
+                    || e.path.ends_with(target)
+            })
+            .ok_or_else(|| anyhow::anyhow!("no JDK found matching: {}", target))?;
 
         let entry_path = self.jdks[idx].path.clone();
         let entry_version = self.jdks[idx].full_version.clone();
 
         if self.jdks[idx].aliases.contains(&new_alias.to_string()) {
-            anyhow::bail!("alias '{}' already exists for JDK {}", new_alias, entry_version);
+            anyhow::bail!(
+                "alias '{}' already exists for JDK {}",
+                new_alias,
+                entry_version
+            );
         }
 
         for other in &self.jdks {
-            if other.path == entry_path { continue; }
+            if other.path == entry_path {
+                continue;
+            }
             if other.full_version == new_alias || other.aliases.contains(&new_alias.to_string()) {
-                anyhow::bail!("alias '{}' is already used by JDK {} ({})",
-                    new_alias, other.full_version, other.path);
+                anyhow::bail!(
+                    "alias '{}' is already used by JDK {} ({})",
+                    new_alias,
+                    other.full_version,
+                    other.path
+                );
             }
         }
 
@@ -157,7 +185,9 @@ impl Config {
     }
 
     pub fn del_alias(&mut self, target: &str, alias: &str) -> Result<String> {
-        let entry = self.jdks.iter_mut()
+        let entry = self
+            .jdks
+            .iter_mut()
             .find(|e| {
                 e.full_version == target
                     || e.aliases.contains(&target.to_string())
@@ -286,7 +316,11 @@ mod tests {
         let mut cfg = sample_config();
         let info = make_info("/usr/lib/jvm/java-17", "17.0.5", &["custom-alias", "extra"]);
         cfg.add_or_update_jdk(&info).unwrap();
-        let entry = cfg.jdks.iter().find(|e| e.path == "/usr/lib/jvm/java-17").unwrap();
+        let entry = cfg
+            .jdks
+            .iter()
+            .find(|e| e.path == "/usr/lib/jvm/java-17")
+            .unwrap();
         assert!(entry.aliases.contains(&"custom-alias".to_string()));
         assert!(entry.aliases.contains(&"extra".to_string()));
         // Original auto aliases from existing entry should still be present (merged)
@@ -377,7 +411,10 @@ mod tests {
         let mut cfg = sample_config();
         let result = cfg.del_alias("17.0.2", "17.0.2");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("cannot remove the primary"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("cannot remove the primary"));
     }
 
     #[test]

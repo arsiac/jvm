@@ -97,7 +97,8 @@ enum AliasCommands {
 }
 
 fn cmd_add(path: &str, custom_aliases: &[String]) -> Result<()> {
-    let jdk_path = Path::new(path).canonicalize()
+    let jdk_path = Path::new(path)
+        .canonicalize()
         .with_context(|| format!("cannot access path: {}", path))?;
 
     #[cfg(windows)]
@@ -111,7 +112,10 @@ fn cmd_add(path: &str, custom_aliases: &[String]) -> Result<()> {
     };
 
     if !jdk::java_bin_path(&jdk_path).exists() {
-        anyhow::bail!("{} is not a valid JDK directory (bin/java not found)", jdk_path.display());
+        anyhow::bail!(
+            "{} is not a valid JDK directory (bin/java not found)",
+            jdk_path.display()
+        );
     }
 
     let full_version = jdk::detect_version(&jdk_path)
@@ -217,8 +221,7 @@ fn cmd_alias_remove(target: &str, alias: &str) -> Result<()> {
 }
 
 fn cmd_init(shell: &str) -> Result<()> {
-    let hook = init::generate_hook(shell)
-        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    let hook = init::generate_hook(shell).map_err(|e| anyhow::anyhow!("{}", e))?;
     println!("{}", hook);
     Ok(())
 }
@@ -235,15 +238,13 @@ fn cmd_info() -> Result<()> {
 
     // Check current link status
     let link_status = match std::fs::symlink_metadata(&current_link) {
-        Ok(meta) if meta.file_type().is_symlink() => {
-            match std::fs::read_link(&current_link) {
-                Ok(target) if target.exists() => {
-                    format!("valid → {}", dirs::display_path(&target))
-                }
-                Ok(_) => "broken".to_string(),
-                Err(_) => "broken".to_string(),
+        Ok(meta) if meta.file_type().is_symlink() => match std::fs::read_link(&current_link) {
+            Ok(target) if target.exists() => {
+                format!("valid → {}", dirs::display_path(&target))
             }
-        }
+            Ok(_) => "broken".to_string(),
+            Err(_) => "broken".to_string(),
+        },
         Ok(meta) if meta.is_dir() => "not a symlink (directory)".to_string(),
         Ok(_) => "not a symlink".to_string(),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => "not found".to_string(),
@@ -251,7 +252,9 @@ fn cmd_info() -> Result<()> {
     };
 
     // Current JDK info
-    let current_jdk = config.current.as_ref()
+    let current_jdk = config
+        .current
+        .as_ref()
         .and_then(|v| config.jdks.iter().find(|e| e.full_version == *v));
 
     let title = format!("jvm: JDK Version Manager {}", version);
@@ -269,9 +272,21 @@ fn cmd_info() -> Result<()> {
 
     // Paths
     println!(" \x1b[1mPaths:\x1b[0m");
-    println!("   {:<16} {}", "Config file:", dirs::display_path(&config_file));
-    println!("   {:<16} {}", "Runtime dir:", dirs::display_path(&runtime_dir));
-    println!("   {:<16} {}", "Current link:", dirs::display_path(&current_link));
+    println!(
+        "   {:<16} {}",
+        "Config file:",
+        dirs::display_path(&config_file)
+    );
+    println!(
+        "   {:<16} {}",
+        "Runtime dir:",
+        dirs::display_path(&runtime_dir)
+    );
+    println!(
+        "   {:<16} {}",
+        "Current link:",
+        dirs::display_path(&current_link)
+    );
     println!("   {:<16} {}", "Link status:", link_status);
     match jvm_dir {
         Some(ref d) => println!("   {:<16} {} (overrides all paths above)", "JVM_DIR:", d),
@@ -284,7 +299,11 @@ fn cmd_info() -> Result<()> {
     match current_jdk {
         Some(jdk) => {
             println!("   {:<16} {}", "Current:", jdk.full_version);
-            println!("   {:<16} {}", "Location:", dirs::display_path(Path::new(&jdk.path)));
+            println!(
+                "   {:<16} {}",
+                "Location:",
+                dirs::display_path(Path::new(&jdk.path))
+            );
         }
         None if config.jdks.is_empty() => {
             println!("   {:<16} (no JDK registered)", "Current:");
@@ -299,16 +318,36 @@ fn cmd_info() -> Result<()> {
     // Data Storage
     println!(" \x1b[1mData Storage:\x1b[0m");
     println!("   Configuration (config.json):");
-    println!("     {:<12} {}", "Location:", dirs::display_path(&config_file));
-    println!("     {:<12} Registered JDK paths, version aliases, and the current active JDK version", "Content:");
+    println!(
+        "     {:<12} {}",
+        "Location:",
+        dirs::display_path(&config_file)
+    );
+    println!(
+        "     {:<12} Registered JDK paths, version aliases, and the current active JDK version",
+        "Content:"
+    );
     println!();
     println!("   Runtime Link (current):");
-    println!("     {:<12} {}", "Location:", dirs::display_path(&current_link));
-    println!("     {:<12} Symlink to the active JDK directory.", "Purpose:");
-    println!("     {:<12} Shell hooks read this link to set JAVA_HOME and PATH.", "");
+    println!(
+        "     {:<12} {}",
+        "Location:",
+        dirs::display_path(&current_link)
+    );
+    println!(
+        "     {:<12} Symlink to the active JDK directory.",
+        "Purpose:"
+    );
+    println!(
+        "     {:<12} Shell hooks read this link to set JAVA_HOME and PATH.",
+        ""
+    );
     println!();
     println!("   \x1b[1mReset jvm completely:\x1b[0m");
-    println!("     rm -rf {}", dirs::display_path(config_file.parent().unwrap()));
+    println!(
+        "     rm -rf {}",
+        dirs::display_path(config_file.parent().unwrap())
+    );
     println!("     rm -rf {}", dirs::display_path(&runtime_dir));
 
     Ok(())
@@ -319,10 +358,11 @@ fn cmd_update(target: &Option<String>, all: bool) -> Result<()> {
         (Some(_), true) => anyhow::bail!("Cannot specify both a JDK target and --all"),
         (Some(target), false) => {
             let mut config = config::Config::load()?;
-            let idx = config.jdks.iter().position(|e| {
-                e.full_version == *target
-                    || e.aliases.contains(target)
-            }).ok_or_else(|| anyhow::anyhow!("no JDK found matching: {}", target))?;
+            let idx = config
+                .jdks
+                .iter()
+                .position(|e| e.full_version == *target || e.aliases.contains(target))
+                .ok_or_else(|| anyhow::anyhow!("no JDK found matching: {}", target))?;
             update_single_entry(&mut config, idx)?;
             config.save()?;
         }
@@ -342,7 +382,11 @@ fn cmd_update(target: &Option<String>, all: bool) -> Result<()> {
             }
             match updated {
                 0 => println!("No JDK entries needed updating"),
-                _ => println!("Updated {} JDK entr{}", updated, if updated == 1 { "y" } else { "ies" }),
+                _ => println!(
+                    "Updated {} JDK entr{}",
+                    updated,
+                    if updated == 1 { "y" } else { "ies" }
+                ),
             }
         }
         (None, false) => anyhow::bail!("Please specify a JDK to update, or use --all"),
@@ -355,14 +399,24 @@ fn update_single_entry(config: &mut config::Config, idx: usize) -> Result<()> {
     let jdk_path = Path::new(&entry.path);
 
     if !jdk_path.exists() {
-        anyhow::bail!("path no longer exists: {}", dirs::display_path(entry.path.as_ref()));
+        anyhow::bail!(
+            "path no longer exists: {}",
+            dirs::display_path(entry.path.as_ref())
+        );
     }
     if !jdk::java_bin_path(jdk_path).exists() {
-        anyhow::bail!("not a valid JDK directory (bin/java not found): {}", dirs::display_path(entry.path.as_ref()));
+        anyhow::bail!(
+            "not a valid JDK directory (bin/java not found): {}",
+            dirs::display_path(entry.path.as_ref())
+        );
     }
 
-    let new_version = jdk::detect_version(jdk_path)
-        .with_context(|| format!("cannot detect JDK version for {}", dirs::display_path(entry.path.as_ref())))?;
+    let new_version = jdk::detect_version(jdk_path).with_context(|| {
+        format!(
+            "cannot detect JDK version for {}",
+            dirs::display_path(entry.path.as_ref())
+        )
+    })?;
 
     if new_version == entry.full_version {
         println!("JDK {} is already up to date", entry.full_version);
@@ -370,7 +424,9 @@ fn update_single_entry(config: &mut config::Config, idx: usize) -> Result<()> {
     }
 
     let old_auto = jdk::generate_aliases(&entry.full_version);
-    let custom_aliases: Vec<String> = entry.aliases.iter()
+    let custom_aliases: Vec<String> = entry
+        .aliases
+        .iter()
         .filter(|a| !old_auto.contains(a))
         .cloned()
         .collect();
@@ -383,11 +439,15 @@ fn update_single_entry(config: &mut config::Config, idx: usize) -> Result<()> {
     }
 
     for (i, other) in config.jdks.iter().enumerate() {
-        if i == idx { continue; }
+        if i == idx {
+            continue;
+        }
         for alias in &new_aliases {
             if other.aliases.contains(alias) || other.full_version == *alias {
-                eprintln!("Warning: alias '{}' is also used by JDK {} ({})",
-                    alias, other.full_version, other.path);
+                eprintln!(
+                    "Warning: alias '{}' is also used by JDK {} ({})",
+                    alias, other.full_version, other.path
+                );
             }
         }
     }
@@ -400,7 +460,10 @@ fn update_single_entry(config: &mut config::Config, idx: usize) -> Result<()> {
         config.current = Some(new_version);
     }
 
-    println!("Updated JDK: {} → {} ({})", old_version, config.jdks[idx].full_version, config.jdks[idx].path);
+    println!(
+        "Updated JDK: {} → {} ({})",
+        old_version, config.jdks[idx].full_version, config.jdks[idx].path
+    );
     Ok(())
 }
 

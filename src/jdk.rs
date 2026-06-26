@@ -1,7 +1,7 @@
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
-use std::fs;
 
 use anyhow::{Context, Result};
 
@@ -29,9 +29,7 @@ pub fn parse_release_file(content: &str) -> Option<String> {
     for line in content.lines() {
         let line = line.trim();
         if line.starts_with("JAVA_VERSION=") {
-            let raw = line
-                .strip_prefix("JAVA_VERSION=")?
-                .trim_matches('"');
+            let raw = line.strip_prefix("JAVA_VERSION=")?.trim_matches('"');
             return Some(raw.to_string());
         }
     }
@@ -73,7 +71,10 @@ pub fn detect_version(jdk_path: &Path) -> Result<String> {
         }
     }
 
-    Err(anyhow::anyhow!("cannot detect JDK version: {}", jdk_path.display()))
+    Err(anyhow::anyhow!(
+        "cannot detect JDK version: {}",
+        jdk_path.display()
+    ))
 }
 
 pub fn generate_aliases(full_version: &str) -> Vec<String> {
@@ -259,7 +260,10 @@ OS_NAME="Linux""#;
     #[test]
     fn test_parse_release_file_malformed() {
         let content = "JAVA_VERSION=broken_no_quotes";
-        assert_eq!(parse_release_file(content), Some("broken_no_quotes".to_string()));
+        assert_eq!(
+            parse_release_file(content),
+            Some("broken_no_quotes".to_string())
+        );
     }
 
     // --- parse_java_version_output ---
@@ -267,19 +271,28 @@ OS_NAME="Linux""#;
     #[test]
     fn test_parse_java_version_output_openjdk17() {
         let stderr = "openjdk version \"17.0.2\" 2022-01-18\nOpenJDK Runtime Environment ...";
-        assert_eq!(parse_java_version_output(stderr), Some("17.0.2".to_string()));
+        assert_eq!(
+            parse_java_version_output(stderr),
+            Some("17.0.2".to_string())
+        );
     }
 
     #[test]
     fn test_parse_java_version_output_openjdk8() {
         let stderr = "openjdk version \"1.8.0_492\"\nOpenJDK Runtime Environment ...";
-        assert_eq!(parse_java_version_output(stderr), Some("1.8.0_492".to_string()));
+        assert_eq!(
+            parse_java_version_output(stderr),
+            Some("1.8.0_492".to_string())
+        );
     }
 
     #[test]
     fn test_parse_java_version_output_oracle() {
         let stderr = "java version \"25.0.3\" 2025-04-15 LTS\nJava(TM) SE Runtime Environment ...";
-        assert_eq!(parse_java_version_output(stderr), Some("25.0.3".to_string()));
+        assert_eq!(
+            parse_java_version_output(stderr),
+            Some("25.0.3".to_string())
+        );
     }
 
     #[test]

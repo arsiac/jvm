@@ -21,8 +21,13 @@ fn remove_link(path: &Path) {
 
 #[cfg(unix)]
 fn create_link(target: &Path, link: &Path) -> Result<()> {
-    std::os::unix::fs::symlink(target, link)
-        .with_context(|| format!("failed to create symlink: {} -> {}", link.display(), dirs::display_path(target)))
+    std::os::unix::fs::symlink(target, link).with_context(|| {
+        format!(
+            "failed to create symlink: {} -> {}",
+            link.display(),
+            dirs::display_path(target)
+        )
+    })
 }
 
 #[cfg(windows)]
@@ -30,10 +35,21 @@ fn create_link(target: &Path, link: &Path) -> Result<()> {
     let result = std::os::windows::fs::symlink_dir(target, link);
     if let Err(e) = result {
         if e.raw_os_error() == Some(1314) {
-            junction::create(target, link)
-                .with_context(|| format!("failed to create junction: {} -> {}", link.display(), dirs::display_path(target)))?;
+            junction::create(target, link).with_context(|| {
+                format!(
+                    "failed to create junction: {} -> {}",
+                    link.display(),
+                    dirs::display_path(target)
+                )
+            })?;
         } else {
-            return Err(e).with_context(|| format!("failed to create symlink: {} -> {}", link.display(), dirs::display_path(target)));
+            return Err(e).with_context(|| {
+                format!(
+                    "failed to create symlink: {} -> {}",
+                    link.display(),
+                    dirs::display_path(target)
+                )
+            });
         }
     }
     Ok(())
@@ -88,7 +104,11 @@ pub fn switch_version(version: &str) -> Result<()> {
         return Err(e);
     }
 
-    println!("Switched to JDK {} ({})", entry.full_version, dirs::display_path(entry.path.as_ref()));
+    println!(
+        "Switched to JDK {} ({})",
+        entry.full_version,
+        dirs::display_path(entry.path.as_ref())
+    );
 
     let current_bin = dirs::current_link_path().join("bin");
     let current_bin_str = current_bin.to_string_lossy().to_string();
@@ -118,7 +138,6 @@ mod tests {
     use super::*;
     use crate::config::JdkEntry;
     use serial_test::serial;
-    use std::path::PathBuf;
     use tempfile::TempDir;
 
     fn setup_config_with_jdks(tmp: &TempDir) -> (Config, String) {
@@ -146,9 +165,12 @@ mod tests {
         std::env::set_var("JVM_DIR", &jvm_dir);
 
         let (cfg, _) = setup_config_with_jdks(&tmp);
-        crate::config::Config { current: cfg.current.clone(), jdks: cfg.jdks.clone() }
-            .save()
-            .unwrap();
+        crate::config::Config {
+            current: cfg.current.clone(),
+            jdks: cfg.jdks.clone(),
+        }
+        .save()
+        .unwrap();
 
         let result = switch_version("17.0.2");
         assert!(result.is_ok(), "switch_version failed: {:?}", result.err());
@@ -169,7 +191,10 @@ mod tests {
         let jvm_dir = tmp.path().join("jvm");
         std::env::set_var("JVM_DIR", &jvm_dir);
 
-        let cfg = Config { current: None, jdks: vec![] };
+        let cfg = Config {
+            current: None,
+            jdks: vec![],
+        };
         cfg.save().unwrap();
 
         let result = switch_version("nonexistent");
@@ -182,15 +207,20 @@ mod tests {
     #[cfg(unix)]
     #[serial]
     fn test_switch_version_atomic_replacement() {
+        use std::path::PathBuf;
+
         let tmp = TempDir::new().unwrap();
         let jvm_dir = tmp.path().join("jvm");
         std::env::set_var("JVM_DIR", &jvm_dir);
         std::fs::create_dir_all(&jvm_dir).unwrap();
 
         let (cfg, jdk_path) = setup_config_with_jdks(&tmp);
-        crate::config::Config { current: None, jdks: cfg.jdks }
-            .save()
-            .unwrap();
+        crate::config::Config {
+            current: None,
+            jdks: cfg.jdks,
+        }
+        .save()
+        .unwrap();
 
         switch_version("17.0.2").unwrap();
 
@@ -211,9 +241,12 @@ mod tests {
         std::env::set_var("JVM_DIR", &jvm_dir);
 
         let (cfg, _) = setup_config_with_jdks(&tmp);
-        crate::config::Config { current: None, jdks: cfg.jdks }
-            .save()
-            .unwrap();
+        crate::config::Config {
+            current: None,
+            jdks: cfg.jdks,
+        }
+        .save()
+        .unwrap();
 
         switch_version("17.0.2").unwrap();
 
@@ -223,5 +256,3 @@ mod tests {
         std::env::remove_var("JVM_DIR");
     }
 }
-
-

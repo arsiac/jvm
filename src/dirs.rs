@@ -13,9 +13,7 @@ pub fn config_dir() -> PathBuf {
     if let Ok(val) = env::var("JVM_DIR") {
         return PathBuf::from(val);
     }
-    let base = dirs::config_dir().unwrap_or_else(|| {
-        dirs::home_dir().unwrap().join(".config")
-    });
+    let base = dirs::config_dir().unwrap_or_else(|| dirs::home_dir().unwrap().join(".config"));
     base.join("jvm")
 }
 
