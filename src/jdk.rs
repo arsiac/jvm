@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use std::fs;
 
@@ -9,6 +10,19 @@ pub struct JdkInfo {
     pub path: String,
     pub full_version: String,
     pub aliases: Vec<String>,
+}
+
+/// Returns the platform-appropriate Java executable path.
+///
+/// - Windows: `bin/java.exe`
+/// - Other:   `bin/java`
+pub fn java_bin_path(jdk_path: &Path) -> PathBuf {
+    let bin = jdk_path.join("bin");
+    if cfg!(windows) {
+        bin.join("java.exe")
+    } else {
+        bin.join("java")
+    }
 }
 
 pub fn detect_version(jdk_path: &Path) -> Result<String> {
@@ -28,7 +42,7 @@ pub fn detect_version(jdk_path: &Path) -> Result<String> {
         }
     }
 
-    let java_bin = jdk_path.join("bin").join("java");
+    let java_bin = java_bin_path(jdk_path);
     if java_bin.exists() {
         let output = Command::new(&java_bin)
             .arg("-version")

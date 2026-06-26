@@ -72,6 +72,14 @@ For fish users:
 jvm init fish | source
 ```
 
+For PowerShell users (Windows):
+
+```powershell
+jvm init powershell | Out-String | Invoke-Expression
+```
+
+Add the line above to your PowerShell profile (`$PROFILE`) to make it permanent.
+
 ## Alias Rules
 
 | JDK Version | Auto-generated Aliases |
@@ -84,13 +92,12 @@ Custom aliases can be added via the `--alias` flag during `jvm add`.
 
 ## How It Works
 
-### Directory Layout (XDG Base Directory Specification)
+### Directory Layout
 
-| Purpose | Path | Controlled By |
-|---------|------|---------------|
-| Configuration (JDK metadata) | `${XDG_CONFIG_HOME:-$HOME/.config}/jvm/config.json` | `JVM_DIR` / `XDG_CONFIG_HOME` |
-| Runtime (current symlink) | `${XDG_RUNTIME_DIR:-...}/jvm/current` | `JVM_DIR` / `XDG_RUNTIME_DIR` |
+| Purpose | Linux / macOS | Windows |
+|---------|---------------|---------|
+| Configuration (JDK metadata) | `${XDG_CONFIG_HOME:-$HOME/.config}/jvm/config.json` | `%APPDATA%\jvm\config.json` |
+| Runtime (current symlink) | `${XDG_RUNTIME_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}}/jvm/current` | `%APPDATA%\jvm\current` |
 
-- `$JVM_DIR` overrides all paths (backwards-compatible); when unset, paths follow XDG specs
-- The `current` symlink is created in `$XDG_RUNTIME_DIR/jvm/` (e.g. `/run/user/$UID/jvm/current`), falling back to the config directory when `$XDG_RUNTIME_DIR` is not set
-- The shell hook reads this symlink and sets `JAVA_HOME` and `PATH`
+All paths can be overridden by setting `$JVM_DIR` (works on all platforms).  
+The shell hook reads the `current` symlink/junction and sets `JAVA_HOME` and `PATH`.

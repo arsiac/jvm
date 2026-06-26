@@ -69,13 +69,13 @@ end
 pub fn generate_powershell_hook() -> String {
     r#"if ($env:JVM_DIR) {
     $__jvm_current = Join-Path $env:JVM_DIR "current"
+} elseif ($env:APPDATA) {
+    $__jvm_current = [System.IO.Path]::Combine($env:APPDATA, "jvm", "current")
 } elseif ($env:XDG_RUNTIME_DIR) {
-    $__jvm_current = Join-Path $env:XDG_RUNTIME_DIR "jvm" "current"
-} elseif (($env:OS -eq 'Windows_NT') -and $env:LOCALAPPDATA) {
-    $__jvm_current = Join-Path $env:LOCALAPPDATA "jvm" "current"
+    $__jvm_current = [System.IO.Path]::Combine($env:XDG_RUNTIME_DIR, "jvm", "current")
 } else {
     $__home = if ($HOME) { $HOME } else { $env:USERPROFILE }
-    $__jvm_current = Join-Path $__home ".config" "jvm" "current"
+    $__jvm_current = [System.IO.Path]::Combine($__home, ".config", "jvm", "current")
 }
 
 $__sep = [System.IO.Path]::PathSeparator

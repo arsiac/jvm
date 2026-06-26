@@ -4,7 +4,7 @@ mod init;
 mod jdk;
 mod switch;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
@@ -12,6 +12,14 @@ use comfy_table::presets;
 use comfy_table::*;
 
 use crate::jdk::JdkInfo;
+
+/// Strip the `\\?\` prefix from Windows verbatim paths for cleaner display.
+#[cfg(windows)]
+fn display_path(path: &str) -> &str {
+    path.strip_prefix(r"\\?\").unwrap_or(path)
+}
+#[cfg(not(windows))]
+fn display_path(path: &str) -> &str { path }
 
 #[derive(Parser)]
 #[command(name = "jvm", version, about = "JDK Version Manager")]
@@ -91,10 +99,19 @@ enum AliasCommands {
 }
 
 fn cmd_add(path: &str, custom_aliases: &[String]) -> Result<()> {
-    let jdk_path = Path::new(path).canonicalize()
+    let mut jdk_path = Path::new(path).canonicalize()
         .with_context(|| format!("cannot access path: {}", path))?;
 
-    if !jdk_path.join("bin").join("java").exists() {
+    // Strip \\?\ prefix on Windows for cleaner display
+    #[cfg(windows)]
+    {
+        let path_str = jdk_path.to_string_lossy().to_string();
+        if let Some(stripped) = path_str.strip_prefix(r"\\?\") {
+            jdk_path = PathBuf::from(stripped);
+        }
+    }
+
+    if !jdk::java_bin_path(&jdk_path).exists() {
         anyhow::bail!("{} is not a valid JDK directory (bin/java not found)", jdk_path.display());
     }
 
@@ -166,7 +183,7 @@ fn cmd_list() -> Result<()> {
 
         table.add_row(vec![
             Cell::new(marker),
-            Cell::new(&entry.path),
+            Cell::new(display_path(&entry.path)),
             version,
             Cell::new(&entry.aliases.join(", ")),
         ]);
@@ -248,14 +265,14 @@ fn update_single_entry(config: &mut config::Config, idx: usize) -> Result<()> {
     let jdk_path = Path::new(&entry.path);
 
     if !jdk_path.exists() {
-        anyhow::bail!("path no longer exists: {}", entry.path);
+        anyhow::bail!("path no longer exists: {}", display_path(&entry.path));
     }
-    if !jdk_path.join("bin").join("java").exists() {
-        anyhow::bail!("not a valid JDK directory (bin/java not found): {}", entry.path);
+    if !jdk::java_bin_path(&jdk_path).exists() {
+        anyhow::bail!("not a valid JDK directory (bin/java not found): {}", display_path(&entry.path));
     }
 
     let new_version = jdk::detect_version(jdk_path)
-        .with_context(|| format!("cannot detect JDK version for {}", entry.path))?;
+        .with_context(|| format!("cannot detect JDK version for {}", display_path(&entry.path)))?;
 
     if new_version == entry.full_version {
         println!("JDK {} is already up to date", entry.full_version);
