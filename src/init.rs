@@ -1,4 +1,5 @@
 fn generate_posix_hook(shell_name: &str) -> String {
+    let shell_rc = if shell_name == "bash" { "bashrc" } else { "zshrc" };
     format!(
         r#"if [ -n "$JVM_DIR" ]; then
     __jvm_current="$JVM_DIR/current"
@@ -19,8 +20,9 @@ fi
 hash -r 2>/dev/null || true
 # Usage:
 #   Add the following to your ~/.{shell_rc}:
-#       eval "$(jvm init {shell_name})"#,
-        shell_rc = if shell_name == "bash" { "bashrc" } else { "zshrc" },
+#       eval "$(jvm init {shell_name})"
+"#,
+        shell_rc = shell_rc,
         shell_name = shell_name,
     )
 }
