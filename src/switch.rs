@@ -8,6 +8,7 @@ use crate::config::Config;
 use crate::dirs;
 
 #[cfg(unix)]
+#[allow(dead_code)]
 fn remove_link(path: &Path) {
     let _ = fs::remove_file(path);
 }
@@ -46,17 +47,46 @@ pub fn switch_version(version: &str) -> Result<()> {
         .cloned()
         .ok_or_else(|| anyhow::anyhow!("version or alias not found: {}", version))?;
 
-    config.current = Some(entry.full_version.clone());
-    config.save()?;
-
     let runtime_dir = dirs::runtime_dir();
     fs::create_dir_all(&runtime_dir)
         .with_context(|| format!("failed to create directory: {}", runtime_dir.display()))?;
 
     let current_link = dirs::current_link_path();
 
-    remove_link(&current_link);
-    create_link(entry.path.as_ref(), current_link.as_ref())?;
+    // Save the old link target for potential rollback
+    #[cfg(unix)]
+    let old_target = fs::read_link(&current_link).ok();
+
+    // Atomically replace the symlink first, then update the config.
+    // This ensures the link is always consistent: if the config save fails,
+    // the link already points to the new JDK (which is safe).
+    #[cfg(unix)]
+    {
+        let tmp_link = current_link.with_extension("tmp");
+        create_link(entry.path.as_ref(), &tmp_link)?;
+        fs::rename(&tmp_link, &current_link)
+            .with_context(|| format!("failed to replace symlink: {}", current_link.display()))?;
+    }
+
+    #[cfg(windows)]
+    {
+        remove_link(&current_link);
+        create_link(entry.path.as_ref(), &current_link)?;
+    }
+
+    // Symlink is ready; now persist the config
+    config.current = Some(entry.full_version.clone());
+    if let Err(e) = config.save() {
+        // Config persistence failed – roll back the symlink
+        #[cfg(unix)]
+        if let Some(old) = old_target {
+            let rollback_tmp = current_link.with_extension("rollback");
+            if create_link(&old, &rollback_tmp).is_ok() {
+                let _ = fs::rename(&rollback_tmp, &current_link);
+            }
+        }
+        return Err(e);
+    }
 
     println!("Switched to JDK {} ({})", entry.full_version, dirs::display_path(entry.path.as_ref()));
 

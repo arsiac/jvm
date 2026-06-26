@@ -49,8 +49,11 @@ impl Config {
                 .with_context(|| format!("failed to create directory: {}", parent.display()))?;
         }
         let content = serde_json::to_string_pretty(self)?;
-        fs::write(&path, content)
-            .with_context(|| format!("failed to write config: {}", path.display()))?;
+        let tmp_path = PathBuf::from(format!("{}.tmp", path.display()));
+        fs::write(&tmp_path, &content)
+            .with_context(|| format!("failed to write config: {}", tmp_path.display()))?;
+        fs::rename(&tmp_path, &path)
+            .with_context(|| format!("failed to rename config: {} -> {}", tmp_path.display(), path.display()))?;
         Ok(())
     }
 
