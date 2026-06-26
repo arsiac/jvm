@@ -4,6 +4,7 @@ mod init;
 mod jdk;
 mod switch;
 
+use std::env;
 use std::path::Path;
 #[cfg(windows)]
 use std::path::PathBuf;
@@ -67,6 +68,9 @@ enum Commands {
         #[arg(long)]
         all: bool,
     },
+
+    /// Display detailed system-wide information
+    Info,
 
     /// Manage JDK aliases
     #[command(subcommand)]
@@ -219,6 +223,97 @@ fn cmd_init(shell: &str) -> Result<()> {
     Ok(())
 }
 
+fn cmd_info() -> Result<()> {
+    let config = config::Config::load()?;
+    let version = env!("CARGO_PKG_VERSION");
+    let os = std::env::consts::OS;
+
+    let config_file = config::Config::path()?;
+    let runtime_dir = dirs::runtime_dir();
+    let current_link = dirs::current_link_path();
+    let jvm_dir = env::var("JVM_DIR").ok();
+
+    // Check current link status
+    let link_status = match std::fs::symlink_metadata(&current_link) {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            match std::fs::read_link(&current_link) {
+                Ok(target) if target.exists() => {
+                    format!("valid → {}", dirs::display_path(&target))
+                }
+                Ok(_) => "broken".to_string(),
+                Err(_) => "broken".to_string(),
+            }
+        }
+        Ok(meta) if meta.is_dir() => "not a symlink (directory)".to_string(),
+        Ok(_) => "not a symlink".to_string(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => "not found".to_string(),
+        Err(e) => format!("error: {}", e),
+    };
+
+    // Current JDK info
+    let current_jdk = config.current.as_ref()
+        .and_then(|v| config.jdks.iter().find(|e| e.full_version == *v));
+
+    let title = format!("jvm: JDK Version Manager {}", version);
+    let sep = "=".repeat(title.len());
+
+    println!("{}", title);
+    println!("{}", sep);
+    println!();
+
+    // Program Information
+    println!(" \x1b[1mProgram:\x1b[0m");
+    println!("   {:<16} {}", "Version:", version);
+    println!("   {:<16} {}", "Platform:", os);
+    println!();
+
+    // Paths
+    println!(" \x1b[1mPaths:\x1b[0m");
+    println!("   {:<16} {}", "Config file:", dirs::display_path(&config_file));
+    println!("   {:<16} {}", "Runtime dir:", dirs::display_path(&runtime_dir));
+    println!("   {:<16} {}", "Current link:", dirs::display_path(&current_link));
+    println!("   {:<16} {}", "Link status:", link_status);
+    match jvm_dir {
+        Some(ref d) => println!("   {:<16} {} (overrides all paths above)", "JVM_DIR:", d),
+        None => println!("   {:<16} (not set)", "JVM_DIR:"),
+    }
+    println!();
+
+    // JDK Status
+    println!(" \x1b[1mJDK Status:\x1b[0m");
+    match current_jdk {
+        Some(jdk) => {
+            println!("   {:<16} {}", "Current:", jdk.full_version);
+            println!("   {:<16} {}", "Location:", dirs::display_path(Path::new(&jdk.path)));
+        }
+        None if config.jdks.is_empty() => {
+            println!("   {:<16} (no JDK registered)", "Current:");
+        }
+        None => {
+            println!("   {:<16} (none active)", "Current:");
+        }
+    }
+    println!("   {:<16} {}", "Registered:", config.jdks.len());
+    println!();
+
+    // Data Storage
+    println!(" \x1b[1mData Storage:\x1b[0m");
+    println!("   Configuration (config.json):");
+    println!("     {:<12} {}", "Location:", dirs::display_path(&config_file));
+    println!("     {:<12} Registered JDK paths, version aliases, and the current active JDK version", "Content:");
+    println!();
+    println!("   Runtime Link (current):");
+    println!("     {:<12} {}", "Location:", dirs::display_path(&current_link));
+    println!("     {:<12} Symlink to the active JDK directory.", "Purpose:");
+    println!("     {:<12} Shell hooks read this link to set JAVA_HOME and PATH.", "");
+    println!();
+    println!("   \x1b[1mReset jvm completely:\x1b[0m");
+    println!("     rm -rf {}", dirs::display_path(config_file.parent().unwrap()));
+    println!("     rm -rf {}", dirs::display_path(&runtime_dir));
+
+    Ok(())
+}
+
 fn cmd_update(target: &Option<String>, all: bool) -> Result<()> {
     match (target, all) {
         (Some(_), true) => anyhow::bail!("Cannot specify both a JDK target and --all"),
@@ -319,6 +414,7 @@ fn main() -> Result<()> {
         Commands::Init { shell } => cmd_init(&shell)?,
         Commands::Current => cmd_current()?,
         Commands::Remove { target } => cmd_remove(&target)?,
+        Commands::Info => cmd_info()?,
         Commands::Update { target, all } => cmd_update(&target, all)?,
         Commands::Alias(cmd) => match cmd {
             AliasCommands::Add { target, alias } => cmd_alias_add(&target, &alias)?,
