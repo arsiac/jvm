@@ -7,13 +7,6 @@ use anyhow::{Context, Result};
 use crate::config::Config;
 use crate::dirs;
 
-#[cfg(windows)]
-fn display_path(path: &str) -> &str {
-    path.strip_prefix(r"\\?\").unwrap_or(path)
-}
-#[cfg(not(windows))]
-fn display_path(path: &str) -> &str { path }
-
 #[cfg(unix)]
 fn remove_link(path: &Path) {
     let _ = fs::remove_file(path);
@@ -28,7 +21,7 @@ fn remove_link(path: &Path) {
 #[cfg(unix)]
 fn create_link(target: &Path, link: &Path) -> Result<()> {
     std::os::unix::fs::symlink(target, link)
-        .with_context(|| format!("failed to create symlink: {} -> {}", link.display(), display_path(target.to_string_lossy().as_ref())))
+        .with_context(|| format!("failed to create symlink: {} -> {}", link.display(), dirs::display_path(target)))
 }
 
 #[cfg(windows)]
@@ -37,9 +30,9 @@ fn create_link(target: &Path, link: &Path) -> Result<()> {
     if let Err(e) = result {
         if e.raw_os_error() == Some(1314) {
             junction::create(target, link)
-                .with_context(|| format!("failed to create junction: {} -> {}", link.display(), display_path(target.to_string_lossy().as_ref())))?;
+                .with_context(|| format!("failed to create junction: {} -> {}", link.display(), dirs::display_path(target)))?;
         } else {
-            return Err(e).with_context(|| format!("failed to create symlink: {} -> {}", link.display(), display_path(target.to_string_lossy().as_ref())));
+            return Err(e).with_context(|| format!("failed to create symlink: {} -> {}", link.display(), dirs::display_path(target)));
         }
     }
     Ok(())
@@ -65,7 +58,7 @@ pub fn switch_version(version: &str) -> Result<()> {
     remove_link(&current_link);
     create_link(entry.path.as_ref(), current_link.as_ref())?;
 
-    println!("Switched to JDK {} ({})", entry.full_version, display_path(&entry.path));
+    println!("Switched to JDK {} ({})", entry.full_version, dirs::display_path(entry.path.as_ref()));
 
     let current_bin = dirs::current_link_path().join("bin");
     let current_bin_str = current_bin.to_string_lossy().to_string();

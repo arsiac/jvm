@@ -13,14 +13,6 @@ use comfy_table::*;
 
 use crate::jdk::JdkInfo;
 
-/// Strip the `\\?\` prefix from Windows verbatim paths for cleaner display.
-#[cfg(windows)]
-fn display_path(path: &str) -> &str {
-    path.strip_prefix(r"\\?\").unwrap_or(path)
-}
-#[cfg(not(windows))]
-fn display_path(path: &str) -> &str { path }
-
 #[derive(Parser)]
 #[command(name = "jvm", version, about = "JDK Version Manager")]
 struct Cli {
@@ -183,7 +175,7 @@ fn cmd_list() -> Result<()> {
 
         table.add_row(vec![
             Cell::new(marker),
-            Cell::new(display_path(&entry.path)),
+            Cell::new(dirs::display_path(entry.path.as_ref())),
             version,
             Cell::new(&entry.aliases.join(", ")),
         ]);
@@ -265,14 +257,14 @@ fn update_single_entry(config: &mut config::Config, idx: usize) -> Result<()> {
     let jdk_path = Path::new(&entry.path);
 
     if !jdk_path.exists() {
-        anyhow::bail!("path no longer exists: {}", display_path(&entry.path));
+        anyhow::bail!("path no longer exists: {}", dirs::display_path(entry.path.as_ref()));
     }
     if !jdk::java_bin_path(&jdk_path).exists() {
-        anyhow::bail!("not a valid JDK directory (bin/java not found): {}", display_path(&entry.path));
+        anyhow::bail!("not a valid JDK directory (bin/java not found): {}", dirs::display_path(entry.path.as_ref()));
     }
 
     let new_version = jdk::detect_version(jdk_path)
-        .with_context(|| format!("cannot detect JDK version for {}", display_path(&entry.path)))?;
+        .with_context(|| format!("cannot detect JDK version for {}", dirs::display_path(entry.path.as_ref())))?;
 
     if new_version == entry.full_version {
         println!("JDK {} is already up to date", entry.full_version);

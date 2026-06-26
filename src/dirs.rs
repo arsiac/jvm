@@ -1,5 +1,6 @@
+use std::borrow::Cow;
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Config directory where config.json lives.
 ///
@@ -48,4 +49,19 @@ pub fn runtime_dir() -> PathBuf {
 /// Full path to the `current` symlink.
 pub fn current_link_path() -> PathBuf {
     runtime_dir().join("current")
+}
+
+/// Strip the `\\?\` prefix from Windows verbatim paths for cleaner display.
+#[cfg(windows)]
+pub fn display_path(path: &Path) -> Cow<'_, str> {
+    let s = path.to_string_lossy();
+    if let Some(stripped) = s.strip_prefix(r"\\?\") {
+        Cow::Owned(stripped.to_string())
+    } else {
+        s
+    }
+}
+#[cfg(not(windows))]
+pub fn display_path(path: &Path) -> Cow<'_, str> {
+    path.to_string_lossy()
 }
