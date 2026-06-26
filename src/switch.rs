@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::path::Path;
 
 use anyhow::{Context, Result};
 
@@ -12,6 +13,37 @@ fn display_path(path: &str) -> &str {
 }
 #[cfg(not(windows))]
 fn display_path(path: &str) -> &str { path }
+
+#[cfg(unix)]
+fn remove_link(path: &Path) {
+    let _ = fs::remove_file(path);
+}
+
+#[cfg(windows)]
+fn remove_link(path: &Path) {
+    let _ = junction::delete(path);
+    let _ = fs::remove_file(path).or_else(|_| fs::remove_dir(path));
+}
+
+#[cfg(unix)]
+fn create_link(target: &Path, link: &Path) -> Result<()> {
+    std::os::unix::fs::symlink(target, link)
+        .with_context(|| format!("failed to create symlink: {} -> {}", link.display(), display_path(target.to_string_lossy().as_ref())))
+}
+
+#[cfg(windows)]
+fn create_link(target: &Path, link: &Path) -> Result<()> {
+    let result = std::os::windows::fs::symlink_dir(target, link);
+    if let Err(e) = result {
+        if e.raw_os_error() == Some(1314) {
+            junction::create(target, link)
+                .with_context(|| format!("failed to create junction: {} -> {}", link.display(), display_path(target.to_string_lossy().as_ref())))?;
+        } else {
+            return Err(e).with_context(|| format!("failed to create symlink: {} -> {}", link.display(), display_path(target.to_string_lossy().as_ref())));
+        }
+    }
+    Ok(())
+}
 
 pub fn switch_version(version: &str) -> Result<()> {
     let mut config = Config::load()?;
@@ -30,31 +62,8 @@ pub fn switch_version(version: &str) -> Result<()> {
 
     let current_link = dirs::current_link_path();
 
-    // Remove any existing item: junction, directory, file, or symlink
-    #[cfg(windows)]
-    let _ = junction::delete(&current_link);
-    let _ = fs::remove_file(&current_link);
-    let _ = fs::remove_dir(&current_link);
-
-    #[cfg(unix)]
-    {
-        std::os::unix::fs::symlink(&entry.path, &current_link)
-            .with_context(|| format!("failed to create symlink: {} -> {}", current_link.display(), display_path(&entry.path)))?;
-    }
-
-    #[cfg(windows)]
-    {
-        let result = std::os::windows::fs::symlink_dir(&entry.path, &current_link);
-        if let Err(e) = result {
-            if e.raw_os_error() == Some(1314) {
-                // No symlink privilege: fall back to junction
-                junction::create(&entry.path, &current_link)
-                    .with_context(|| format!("failed to create junction: {} -> {}", current_link.display(), display_path(&entry.path)))?;
-            } else {
-                return Err(e).with_context(|| format!("failed to create symlink: {} -> {}", current_link.display(), display_path(&entry.path)));
-            }
-        }
-    }
+    remove_link(&current_link);
+    create_link(entry.path.as_ref(), current_link.as_ref())?;
 
     println!("Switched to JDK {} ({})", entry.full_version, display_path(&entry.path));
 
