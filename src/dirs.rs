@@ -65,3 +65,82 @@ pub fn display_path(path: &Path) -> Cow<'_, str> {
 pub fn display_path(path: &Path) -> Cow<'_, str> {
     path.to_string_lossy()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+    use std::env;
+
+    // --- config_dir ---
+
+    #[test]
+    #[serial]
+    fn test_config_dir_with_jvm_dir() {
+        env::set_var("JVM_DIR", "/custom/jvm");
+        let dir = config_dir();
+        assert_eq!(dir, PathBuf::from("/custom/jvm"));
+        env::remove_var("JVM_DIR");
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_dir_default() {
+        env::remove_var("JVM_DIR");
+        let dir = config_dir();
+        assert!(dir.ends_with("jvm"));
+    }
+
+    // --- runtime_dir ---
+
+    #[test]
+    #[serial]
+    fn test_runtime_dir_with_jvm_dir() {
+        env::set_var("JVM_DIR", "/custom/jvm");
+        let dir = runtime_dir();
+        assert_eq!(dir, PathBuf::from("/custom/jvm"));
+        env::remove_var("JVM_DIR");
+    }
+
+    #[test]
+    #[serial]
+    fn test_runtime_dir_default() {
+        env::remove_var("JVM_DIR");
+        let dir = runtime_dir();
+        assert!(dir.ends_with("jvm"));
+    }
+
+    // --- current_link_path ---
+
+    #[test]
+    #[serial]
+    fn test_current_link_path() {
+        env::set_var("JVM_DIR", "/tmp/test-jvm");
+        let path = current_link_path();
+        assert_eq!(path, PathBuf::from("/tmp/test-jvm/current"));
+        env::remove_var("JVM_DIR");
+    }
+
+    // --- display_path ---
+
+    #[cfg(not(windows))]
+    #[test]
+    fn test_display_path_unix() {
+        let p = Path::new("/usr/lib/jvm/java-17");
+        assert_eq!(display_path(p), "/usr/lib/jvm/java-17");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_display_path_windows_clean() {
+        let p = Path::new("C:\\Program Files\\Java\\jdk-17");
+        assert_eq!(display_path(p), "C:\\Program Files\\Java\\jdk-17");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_display_path_strips_verbatim_prefix() {
+        let p = Path::new(r"\\?\C:\Program Files\Java\jdk-17");
+        assert_eq!(display_path(p), "C:\\Program Files\\Java\\jdk-17");
+    }
+}

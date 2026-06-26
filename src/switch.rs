@@ -113,4 +113,115 @@ pub fn switch_version(version: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::JdkEntry;
+    use serial_test::serial;
+    use std::path::PathBuf;
+    use tempfile::TempDir;
+
+    fn setup_config_with_jdks(tmp: &TempDir) -> (Config, String) {
+        let jdk_dir = tmp.path().join("jdk-17");
+        std::fs::create_dir_all(&jdk_dir).unwrap();
+        std::fs::write(jdk_dir.join("release"), r#"JAVA_VERSION="17.0.2""#).unwrap();
+        let jdk_path_str = jdk_dir.to_string_lossy().to_string();
+
+        let config = Config {
+            current: None,
+            jdks: vec![JdkEntry {
+                path: jdk_path_str.clone(),
+                full_version: "17.0.2".to_string(),
+                aliases: vec!["17".to_string(), "17.0".to_string()],
+            }],
+        };
+        (config, jdk_path_str)
+    }
+
+    #[test]
+    #[serial]
+    fn test_switch_version_success() {
+        let tmp = TempDir::new().unwrap();
+        let jvm_dir = tmp.path().join("jvm");
+        std::env::set_var("JVM_DIR", &jvm_dir);
+
+        let (cfg, _) = setup_config_with_jdks(&tmp);
+        crate::config::Config { current: cfg.current.clone(), jdks: cfg.jdks.clone() }
+            .save()
+            .unwrap();
+
+        let result = switch_version("17.0.2");
+        assert!(result.is_ok(), "switch_version failed: {:?}", result.err());
+
+        let current_link = jvm_dir.join("current");
+        assert!(current_link.exists() || cfg!(windows));
+
+        let loaded = Config::load().unwrap();
+        assert_eq!(loaded.current, Some("17.0.2".to_string()));
+
+        std::env::remove_var("JVM_DIR");
+    }
+
+    #[test]
+    #[serial]
+    fn test_switch_version_not_found() {
+        let tmp = TempDir::new().unwrap();
+        let jvm_dir = tmp.path().join("jvm");
+        std::env::set_var("JVM_DIR", &jvm_dir);
+
+        let cfg = Config { current: None, jdks: vec![] };
+        cfg.save().unwrap();
+
+        let result = switch_version("nonexistent");
+        assert!(result.is_err());
+
+        std::env::remove_var("JVM_DIR");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    #[serial]
+    fn test_switch_version_atomic_replacement() {
+        let tmp = TempDir::new().unwrap();
+        let jvm_dir = tmp.path().join("jvm");
+        std::env::set_var("JVM_DIR", &jvm_dir);
+        std::fs::create_dir_all(&jvm_dir).unwrap();
+
+        let (cfg, jdk_path) = setup_config_with_jdks(&tmp);
+        crate::config::Config { current: None, jdks: cfg.jdks }
+            .save()
+            .unwrap();
+
+        switch_version("17.0.2").unwrap();
+
+        let current_link = jvm_dir.join("current");
+        assert!(current_link.is_symlink());
+        let target = std::fs::read_link(&current_link).unwrap();
+        assert_eq!(target, PathBuf::from(&jdk_path));
+
+        std::env::remove_var("JVM_DIR");
+    }
+
+    #[test]
+    #[cfg(unix)]
+    #[serial]
+    fn test_switch_version_updates_current_in_config() {
+        let tmp = TempDir::new().unwrap();
+        let jvm_dir = tmp.path().join("jvm");
+        std::env::set_var("JVM_DIR", &jvm_dir);
+
+        let (cfg, _) = setup_config_with_jdks(&tmp);
+        crate::config::Config { current: None, jdks: cfg.jdks }
+            .save()
+            .unwrap();
+
+        switch_version("17.0.2").unwrap();
+
+        let loaded = Config::load().unwrap();
+        assert_eq!(loaded.current, Some("17.0.2".to_string()));
+
+        std::env::remove_var("JVM_DIR");
+    }
+}
+
 

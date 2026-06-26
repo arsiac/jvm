@@ -95,3 +95,92 @@ pub fn generate_hook(shell: &str) -> Result<String, String> {
         other => Err(format!("unsupported shell type: {}", other)),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_bash_hook() {
+        let hook = generate_bash_hook();
+        assert!(hook.contains("JAVA_HOME"));
+        assert!(hook.contains("__jvm_current"));
+        assert!(hook.contains("bashrc"));
+        assert!(hook.contains("jvm init bash"));
+        assert!(hook.contains("PATH"));
+    }
+
+    #[test]
+    fn test_generate_zsh_hook() {
+        let hook = generate_zsh_hook();
+        assert!(hook.contains("JAVA_HOME"));
+        assert!(hook.contains("__jvm_current"));
+        assert!(hook.contains("zshrc"));
+        assert!(hook.contains("jvm init zsh"));
+    }
+
+    #[test]
+    fn test_generate_fish_hook() {
+        let hook = generate_fish_hook();
+        assert!(hook.contains("JAVA_HOME"));
+        assert!(hook.contains("__jvm_current"));
+        assert!(hook.contains("jvm init fish"));
+        assert!(hook.contains("set -x PATH"));
+    }
+
+    #[test]
+    fn test_generate_powershell_hook() {
+        let hook = generate_powershell_hook();
+        assert!(hook.contains("JAVA_HOME"));
+        assert!(hook.contains("$__jvm_current"));
+        assert!(hook.contains("jvm init powershell"));
+        assert!(hook.contains("$env:PATH"));
+    }
+
+    #[test]
+    fn test_generate_hook_dispatch() {
+        assert!(generate_hook("bash").is_ok());
+        assert!(generate_hook("zsh").is_ok());
+        assert!(generate_hook("fish").is_ok());
+        assert!(generate_hook("powershell").is_ok());
+    }
+
+    #[test]
+    fn test_generate_hook_unsupported() {
+        let result = generate_hook("tcsh");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("unsupported shell"));
+    }
+
+    #[test]
+    fn test_bash_hook_uses_xdg_runtime_dir() {
+        let hook = generate_bash_hook();
+        assert!(hook.contains("XDG_RUNTIME_DIR"));
+        assert!(hook.contains("XDG_DATA_HOME"));
+    }
+
+    #[test]
+    fn test_fish_hook_basic_structure() {
+        let hook = generate_fish_hook();
+        // Should contain if-else chain for path resolution
+        assert!(hook.contains("JVM_DIR"));
+        assert!(hook.contains("XDG_RUNTIME_DIR"));
+        assert!(hook.contains("XDG_DATA_HOME"));
+    }
+
+    #[test]
+    fn test_powershell_hook_basic_structure() {
+        let hook = generate_powershell_hook();
+        assert!(hook.contains("APPDATA"));
+        assert!(hook.contains("PathSeparator"));
+        assert!(hook.contains("JAVA_HOME"));
+    }
+
+    #[test]
+    fn test_bash_hook_path_already_set() {
+        let hook = generate_bash_hook();
+        // Should have a guard that checks if path already contains __jvm_current/bin
+        assert!(hook.contains("__jvm_current/bin"));
+        assert!(hook.contains("PATH"));
+    }
+}
