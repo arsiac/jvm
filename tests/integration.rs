@@ -664,6 +664,9 @@ fn test_exec_invalid_command() {
         .output()
         .unwrap();
     assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("not found in JDK 17.0.2"));
+    assert!(stderr.contains("Check that the command exists in"));
 }
 
 #[test]

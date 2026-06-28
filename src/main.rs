@@ -228,7 +228,22 @@ fn cmd_exec(target: &str, command: &[String]) -> Result<()> {
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .status()
-        .with_context(|| format!("failed to execute: {}", command[0]))?;
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                anyhow::anyhow!(
+                    "'{}' not found in JDK {} ({})\n\
+                     Location: {}\n\
+                     Hint:  Check that the command exists in:\n       {}",
+                    command[0],
+                    entry.full_version,
+                    target,
+                    entry.path,
+                    dirs::display_path(&jdk_bin)
+                )
+            } else {
+                anyhow::anyhow!("failed to execute '{}': {}", command[0], e)
+            }
+        })?;
 
     std::process::exit(status.code().unwrap_or(1));
 }
