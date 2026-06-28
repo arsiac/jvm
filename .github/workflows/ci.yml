@@ -10,44 +10,74 @@ env:
   BINARY_NAME: jvm
 
 jobs:
-  test:
-    name: Test
-    runs-on: ubuntu-latest
+  ci:
+    name: ${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_os: linux
+            artifact_arch: amd64
+            ext: ""
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            artifact_os: linux
+            artifact_arch: arm64
+            ext: ""
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            artifact_os: macos
+            artifact_arch: amd64
+            ext: ""
+          - os: macos-15
+            target: aarch64-apple-darwin
+            artifact_os: macos
+            artifact_arch: aarch64
+            ext: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_os: windows
+            artifact_arch: amd64
+            ext: ".exe"
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            artifact_os: windows
+            artifact_arch: arm64
+            ext: ".exe"
+
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          target: ${{ matrix.target }}
 
       - name: Run tests
-        run: cargo test
+        run: cargo test --target ${{ matrix.target }}
 
-  build:
-    name: Build and package
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable
-
-      - run: cargo build --release
+      - run: cargo build --release --target ${{ matrix.target }}
 
       - name: Package artifact
         shell: bash
         run: |
           VERSION="$(grep '^version = ' Cargo.toml | sed 's/.*"\(.*\)"/\1/')"
-          BINARY="${{ env.BINARY_NAME }}"
-          strip "target/release/$BINARY"
+          BINARY="${{ env.BINARY_NAME }}${{ matrix.ext }}"
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            strip "target/${{ matrix.target }}/release/$BINARY"
+          fi
           mkdir -p dist
-          cp "target/release/$BINARY" dist/
+          cp "target/${{ matrix.target }}/release/$BINARY" dist/
           cd dist
-          zip -r "../${{ env.BINARY_NAME }}-${VERSION}-linux-amd64.zip" "$BINARY"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a "../${{ env.BINARY_NAME }}-${VERSION}-${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}.zip" "$BINARY"
+          else
+            zip -r "../${{ env.BINARY_NAME }}-${VERSION}-${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}.zip" "$BINARY"
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.BINARY_NAME }}-linux-amd64
+          name: ${{ env.BINARY_NAME }}-${{ matrix.artifact_os }}-${{ matrix.artifact_arch }}
           path: ${{ env.BINARY_NAME }}-*.zip
