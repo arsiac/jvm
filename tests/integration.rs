@@ -244,6 +244,59 @@ fn test_init_unsupported_shell() {
 }
 
 #[test]
+fn test_completion_bash() {
+    let output = jvm_cmd().arg("completion").arg("bash").output().unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("_jvm"));
+    assert!(stdout.contains("COMPREPLY"));
+}
+
+#[test]
+fn test_completion_zsh() {
+    let output = jvm_cmd().arg("completion").arg("zsh").output().unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("#compdef jvm"));
+}
+
+#[test]
+fn test_completion_fish() {
+    let output = jvm_cmd().arg("completion").arg("fish").output().unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("complete"));
+}
+
+#[test]
+fn test_completion_powershell() {
+    let output = jvm_cmd()
+        .arg("completion")
+        .arg("powershell")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Register-ArgumentCompleter"));
+}
+
+#[test]
+fn test_completion_unsupported_shell() {
+    let output = jvm_cmd().arg("completion").arg("tcsh").output().unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unsupported shell"));
+}
+
+#[test]
+fn test_completions_alias() {
+    let output = jvm_cmd().arg("completions").arg("bash").output().unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("_jvm"));
+}
+
+
+#[test]
 fn test_alias_add_and_remove() {
     let tmp = tempfile::TempDir::new().unwrap();
     let jvm_dir = tmp.path().join("jvm");

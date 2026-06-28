@@ -80,6 +80,32 @@ jvm init powershell | Out-String | Invoke-Expression
 
 Add the line above to your PowerShell profile (`$PROFILE`) to make it permanent.
 
+### 6. Shell Completion
+
+Enable tab-completion for `jvm` commands:
+
+**bash**:
+```bash
+source <(jvm completion bash)
+```
+Add the line above to your `~/.bashrc` to make it permanent.
+
+**zsh**:
+```zsh
+source <(jvm completion zsh)
+```
+Add the line above to your `~/.zshrc` to make it permanent.
+
+**fish**:
+```fish
+jvm completion fish | source
+```
+
+**PowerShell**:
+```powershell
+jvm completion powershell | Out-String | Invoke-Expression
+```
+
 ## Alias Rules
 
 | JDK Version | Auto-generated Aliases |

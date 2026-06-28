@@ -1,3 +1,4 @@
+mod completion;
 mod config;
 mod dirs;
 mod init;
@@ -10,7 +11,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use comfy_table::presets;
 use comfy_table::*;
 
@@ -52,6 +53,13 @@ enum Commands {
 
     /// Show the currently active JDK version
     Current,
+
+    /// Generate shell completion scripts
+    #[command(name = "completion", visible_alias = "completions")]
+    Completions {
+        /// Shell type (bash, zsh, fish, powershell, elvish)
+        shell: String,
+    },
 
     /// Remove a registered JDK
     #[command(visible_alias = "rm")]
@@ -353,6 +361,13 @@ fn cmd_info() -> Result<()> {
     Ok(())
 }
 
+fn cmd_completions(shell: &str) -> Result<()> {
+    let script = completion::generate_completion(shell, &mut Cli::command())
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    print!("{}", script);
+    Ok(())
+}
+
 fn cmd_update(target: &Option<String>, all: bool) -> Result<()> {
     match (target, all) {
         (Some(_), true) => anyhow::bail!("Cannot specify both a JDK target and --all"),
@@ -476,6 +491,7 @@ fn main() -> Result<()> {
         Commands::List => cmd_list()?,
         Commands::Init { shell } => cmd_init(&shell)?,
         Commands::Current => cmd_current()?,
+        Commands::Completions { shell } => cmd_completions(&shell)?,
         Commands::Remove { target } => cmd_remove(&target)?,
         Commands::Info => cmd_info()?,
         Commands::Update { target, all } => cmd_update(&target, all)?,
