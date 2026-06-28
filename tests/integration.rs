@@ -596,3 +596,104 @@ fn test_which_nonexistent() {
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("JDK not found"));
 }
+
+#[test]
+fn test_exec_basic() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let jvm_dir = tmp.path().join("jvm");
+    let jdk = create_fake_jdk(tmp.path(), "jdk-17", "17.0.2");
+
+    jvm_cmd()
+        .arg("add")
+        .arg(&jdk)
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+
+    let output = jvm_cmd()
+        .arg("exec")
+        .arg("17.0.2")
+        .arg("echo")
+        .arg("hello-from-jvm")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "exec failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("hello-from-jvm"));
+}
+
+#[test]
+fn test_exec_nonexistent_jdk() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let jvm_dir = tmp.path().join("jvm");
+
+    let output = jvm_cmd()
+        .arg("exec")
+        .arg("99.0.0")
+        .arg("echo")
+        .arg("test")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("JDK not found"));
+}
+
+#[test]
+fn test_exec_invalid_command() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let jvm_dir = tmp.path().join("jvm");
+    let jdk = create_fake_jdk(tmp.path(), "jdk-17", "17.0.2");
+
+    jvm_cmd()
+        .arg("add")
+        .arg(&jdk)
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+
+    let output = jvm_cmd()
+        .arg("exec")
+        .arg("17.0.2")
+        .arg("nonexistent-command-12345")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+}
+
+#[test]
+#[cfg(not(windows))]
+fn test_exec_java_home_set() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let jvm_dir = tmp.path().join("jvm");
+    let jdk = create_fake_jdk(tmp.path(), "jdk-17", "17.0.2");
+
+    jvm_cmd()
+        .arg("add")
+        .arg(&jdk)
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+
+    let output = jvm_cmd()
+        .arg("exec")
+        .arg("17.0.2")
+        .arg("sh")
+        .arg("-c")
+        .arg("echo $JAVA_HOME")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "exec failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    assert_eq!(stdout, jdk.to_string_lossy().to_string());
+}

@@ -86,6 +86,15 @@ enum Commands {
         target: Option<String>,
     },
 
+    /// Run a command using a specific JDK without switching
+    Exec {
+        /// JDK version, alias, or path
+        target: String,
+        /// Command and arguments to execute
+        #[arg(trailing_var_arg = true, required = true, allow_hyphen_values = true)]
+        command: Vec<String>,
+    },
+
     /// Manage JDK aliases
     #[command(subcommand)]
     Alias(AliasCommands),
@@ -188,6 +197,40 @@ fn cmd_which(target: Option<&str>) -> Result<()> {
 
     println!("{}", entry.path);
     Ok(())
+}
+
+fn cmd_exec(target: &str, command: &[String]) -> Result<()> {
+    let config = config::Config::load()?;
+
+    let entry = config
+        .find_by_version(target)
+        .ok_or_else(|| anyhow::anyhow!("JDK not found: {}", target))?;
+
+    let jdk_path = Path::new(&entry.path);
+    let jdk_bin = jdk::java_bin_path(jdk_path)
+        .parent()
+        .unwrap()
+        .to_path_buf();
+
+    let mut path_entries = Vec::new();
+    path_entries.push(jdk_bin.as_os_str().to_os_string());
+    if let Ok(current_path) = env::var("PATH") {
+        path_entries.extend(env::split_paths(&current_path).map(|p| p.into_os_string()));
+    }
+    let new_path = env::join_paths(path_entries)
+        .unwrap_or_else(|_| jdk_bin.to_string_lossy().into_owned().into());
+
+    let status = std::process::Command::new(&command[0])
+        .args(&command[1..])
+        .env("JAVA_HOME", &entry.path)
+        .env("PATH", &new_path)
+        .stdin(std::process::Stdio::inherit())
+        .stdout(std::process::Stdio::inherit())
+        .stderr(std::process::Stdio::inherit())
+        .status()
+        .with_context(|| format!("failed to execute: {}", command[0]))?;
+
+    std::process::exit(status.code().unwrap_or(1));
 }
 
 fn cmd_use(version: &str) -> Result<()> {
@@ -526,6 +569,7 @@ fn main() -> Result<()> {
         Commands::Info => cmd_info()?,
         Commands::Update { target, all } => cmd_update(&target, all)?,
         Commands::Which { target } => cmd_which(target.as_deref())?,
+        Commands::Exec { target, command } => cmd_exec(&target, &command)?,
         Commands::Alias(cmd) => match cmd {
             AliasCommands::Add { target, alias } => cmd_alias_add(&target, &alias)?,
             AliasCommands::Remove { target, alias } => cmd_alias_remove(&target, &alias)?,
