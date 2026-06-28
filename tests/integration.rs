@@ -533,7 +533,11 @@ fn test_which_current() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), jdk.to_string_lossy());
+    let expected = std::fs::canonicalize(&jdk).unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        expected.to_string_lossy()
+    );
 }
 
 #[test]
@@ -556,7 +560,11 @@ fn test_which_by_version() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), jdk.to_string_lossy());
+    let expected = std::fs::canonicalize(&jdk).unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        expected.to_string_lossy()
+    );
 }
 
 #[test]
@@ -579,7 +587,11 @@ fn test_which_by_alias() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), jdk.to_string_lossy());
+    let expected = std::fs::canonicalize(&jdk).unwrap();
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        expected.to_string_lossy()
+    );
 }
 
 #[test]
@@ -697,6 +709,7 @@ fn test_exec_java_home_set() {
         "exec failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
+    let expected = std::fs::canonicalize(&jdk).unwrap();
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    assert_eq!(stdout, jdk.to_string_lossy().to_string());
+    assert_eq!(stdout, expected.to_string_lossy().as_ref());
 }
