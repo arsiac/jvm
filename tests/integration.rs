@@ -471,3 +471,128 @@ fn test_add_update_existing() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+#[test]
+fn test_which_no_jdk() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let jvm_dir = tmp.path().join("jvm");
+
+    let output = jvm_cmd()
+        .arg("which")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("No JDK has been added yet"));
+}
+
+#[test]
+fn test_which_no_active() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let jvm_dir = tmp.path().join("jvm");
+    let jdk = create_fake_jdk(tmp.path(), "jdk-17", "17.0.2");
+
+    jvm_cmd()
+        .arg("add")
+        .arg(&jdk)
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+
+    let output = jvm_cmd()
+        .arg("which")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("No JDK is currently active"));
+}
+
+#[test]
+fn test_which_current() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let jvm_dir = tmp.path().join("jvm");
+    let jdk = create_fake_jdk(tmp.path(), "jdk-17", "17.0.2");
+
+    jvm_cmd()
+        .arg("add")
+        .arg(&jdk)
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    jvm_cmd()
+        .arg("use")
+        .arg("17.0.2")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+
+    let output = jvm_cmd()
+        .arg("which")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), jdk.to_string_lossy());
+}
+
+#[test]
+fn test_which_by_version() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let jvm_dir = tmp.path().join("jvm");
+    let jdk = create_fake_jdk(tmp.path(), "jdk-17", "17.0.2");
+
+    jvm_cmd()
+        .arg("add")
+        .arg(&jdk)
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+
+    let output = jvm_cmd()
+        .arg("which")
+        .arg("17.0.2")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), jdk.to_string_lossy());
+}
+
+#[test]
+fn test_which_by_alias() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let jvm_dir = tmp.path().join("jvm");
+    let jdk = create_fake_jdk(tmp.path(), "jdk-17", "17.0.2");
+
+    jvm_cmd()
+        .arg("add")
+        .arg(&jdk)
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+
+    let output = jvm_cmd()
+        .arg("which")
+        .arg("17")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), jdk.to_string_lossy());
+}
+
+#[test]
+fn test_which_nonexistent() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let jvm_dir = tmp.path().join("jvm");
+
+    let output = jvm_cmd()
+        .arg("which")
+        .arg("99.0.0")
+        .env("JVM_DIR", &jvm_dir)
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("JDK not found"));
+}

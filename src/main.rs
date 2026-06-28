@@ -80,6 +80,12 @@ enum Commands {
     /// Display detailed system-wide information
     Info,
 
+    /// Show the path of a JDK installation
+    Which {
+        /// JDK version, alias, or path (defaults to current active JDK)
+        target: Option<String>,
+    },
+
     /// Manage JDK aliases
     #[command(subcommand)]
     Alias(AliasCommands),
@@ -157,6 +163,30 @@ fn cmd_current() -> Result<()> {
         None if config.jdks.is_empty() => println!("No JDK has been added yet"),
         None => println!("No JDK is currently active"),
     }
+    Ok(())
+}
+
+fn cmd_which(target: Option<&str>) -> Result<()> {
+    let config = config::Config::load()?;
+
+    let version = match target {
+        Some(t) => t.to_string(),
+        None => match &config.current {
+            Some(v) => v.clone(),
+            None if config.jdks.is_empty() => {
+                anyhow::bail!("No JDK has been added yet")
+            }
+            None => {
+                anyhow::bail!("No JDK is currently active")
+            }
+        },
+    };
+
+    let entry = config
+        .find_by_version(&version)
+        .ok_or_else(|| anyhow::anyhow!("JDK not found: {}", version))?;
+
+    println!("{}", entry.path);
     Ok(())
 }
 
@@ -495,6 +525,7 @@ fn main() -> Result<()> {
         Commands::Remove { target } => cmd_remove(&target)?,
         Commands::Info => cmd_info()?,
         Commands::Update { target, all } => cmd_update(&target, all)?,
+        Commands::Which { target } => cmd_which(target.as_deref())?,
         Commands::Alias(cmd) => match cmd {
             AliasCommands::Add { target, alias } => cmd_alias_add(&target, &alias)?,
             AliasCommands::Remove { target, alias } => cmd_alias_remove(&target, &alias)?,
