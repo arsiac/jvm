@@ -28,6 +28,19 @@ fn jvm_cmd() -> Command {
     Command::cargo_bin("jvm").unwrap()
 }
 
+/// Canonicalize a path and strip the Windows `\\?\` prefix,
+/// matching the normalization done by `jvm add`.
+fn normalize_jdk_path(jdk: &std::path::Path) -> PathBuf {
+    let p = std::fs::canonicalize(jdk).unwrap();
+    if cfg!(windows) {
+        let s = p.to_string_lossy().to_string();
+        if let Some(stripped) = s.strip_prefix(r"\\?\") {
+            return PathBuf::from(stripped);
+        }
+    }
+    p
+}
+
 #[test]
 fn test_add_and_list() {
     let tmp = tempfile::TempDir::new().unwrap();
@@ -533,7 +546,7 @@ fn test_which_current() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    let expected = std::fs::canonicalize(&jdk).unwrap();
+    let expected = normalize_jdk_path(&jdk);
     assert_eq!(
         String::from_utf8_lossy(&output.stdout).trim(),
         expected.to_string_lossy()
@@ -560,7 +573,7 @@ fn test_which_by_version() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    let expected = std::fs::canonicalize(&jdk).unwrap();
+    let expected = normalize_jdk_path(&jdk);
     assert_eq!(
         String::from_utf8_lossy(&output.stdout).trim(),
         expected.to_string_lossy()
@@ -587,7 +600,7 @@ fn test_which_by_alias() {
         .output()
         .unwrap();
     assert!(output.status.success());
-    let expected = std::fs::canonicalize(&jdk).unwrap();
+    let expected = normalize_jdk_path(&jdk);
     assert_eq!(
         String::from_utf8_lossy(&output.stdout).trim(),
         expected.to_string_lossy()
@@ -709,7 +722,7 @@ fn test_exec_java_home_set() {
         "exec failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let expected = std::fs::canonicalize(&jdk).unwrap();
+    let expected = normalize_jdk_path(&jdk);
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
     assert_eq!(stdout, expected.to_string_lossy().as_ref());
 }
