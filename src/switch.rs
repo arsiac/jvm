@@ -132,6 +132,48 @@ pub fn switch_version(version: &str) -> Result<()> {
     Ok(())
 }
 
+/// Restore the current symlink from the persisted config if it's missing or broken.
+pub fn heal_link() -> Result<()> {
+    let config = Config::load()?;
+    let link = dirs::current_link_path();
+
+    // Check if the link already exists and points to a valid target
+    if let Ok(meta) = fs::symlink_metadata(&link) {
+        if meta.file_type().is_symlink() {
+            if let Ok(target) = fs::read_link(&link) {
+                if target.exists() {
+                    return Ok(());
+                }
+            }
+        }
+    }
+
+    // No active version to restore
+    let version = match config.current {
+        Some(ref v) => v,
+        None => return Ok(()),
+    };
+
+    let entry = match config.find_by_version(version) {
+        Some(e) => e.clone(),
+        None => {
+            eprintln!(
+                "warning: current JDK '{}' not found in config, cannot restore symlink",
+                version
+            );
+            return Ok(());
+        }
+    };
+
+    let runtime_dir = dirs::runtime_dir();
+    fs::create_dir_all(&runtime_dir)
+        .with_context(|| format!("failed to create runtime directory: {}", runtime_dir.display()))?;
+
+    create_link(entry.path.as_ref(), &link)?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

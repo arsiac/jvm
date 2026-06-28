@@ -317,6 +317,7 @@ fn cmd_alias_remove(target: &str, alias: &str) -> Result<()> {
 }
 
 fn cmd_init(shell: &str) -> Result<()> {
+    let _ = switch::heal_link();
     let hook = init::generate_hook(shell).map_err(|e| anyhow::anyhow!("{}", e))?;
     println!("{}", hook);
     Ok(())
