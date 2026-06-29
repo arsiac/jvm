@@ -70,7 +70,6 @@ pub fn switch_version(version: &str) -> Result<()> {
     let current_link = dirs::current_link_path();
 
     // Save the old link target for potential rollback
-    #[cfg(unix)]
     let old_target = fs::read_link(&current_link).ok();
 
     // Atomically replace the symlink first, then update the config.
@@ -99,6 +98,14 @@ pub fn switch_version(version: &str) -> Result<()> {
             let rollback_tmp = current_link.with_extension("rollback");
             if create_link(&old, &rollback_tmp).is_ok() {
                 let _ = fs::rename(&rollback_tmp, &current_link);
+            }
+        }
+
+        #[cfg(windows)]
+        if let Some(ref old) = old_target {
+            let _ = remove_link(&current_link);
+            if std::os::windows::fs::symlink_dir(old, &current_link).is_err() {
+                let _ = junction::create(old, &current_link);
             }
         }
     })?;
