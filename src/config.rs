@@ -109,14 +109,9 @@ impl Config {
     }
 
     pub fn find_by_version(&self, target: &str) -> Option<&JdkEntry> {
-        for entry in &self.jdks {
-            if entry.full_version == target || entry.aliases.contains(&target.to_string()) {
-                return Some(entry);
-            }
-        }
-        self.jdks
-            .iter()
-            .find(|entry| entry.path == target || entry.path.ends_with(target))
+        self.jdks.iter().find(|entry| {
+            entry.full_version == target || entry.aliases.contains(&target.to_string())
+        })
     }
 
     pub fn remove_jdk(&mut self, version_or_path: &str) -> Result<()> {
@@ -257,20 +252,6 @@ mod tests {
         let cfg = sample_config();
         let entry = cfg.find_by_version("8").unwrap();
         assert_eq!(entry.full_version, "1.8.0_492");
-    }
-
-    #[test]
-    fn test_find_by_exact_path() {
-        let cfg = sample_config();
-        let entry = cfg.find_by_version("/usr/lib/jvm/java-17").unwrap();
-        assert_eq!(entry.full_version, "17.0.2");
-    }
-
-    #[test]
-    fn test_find_by_path_suffix() {
-        let cfg = sample_config();
-        let entry = cfg.find_by_version("java-21").unwrap();
-        assert_eq!(entry.full_version, "21.0.1");
     }
 
     #[test]
