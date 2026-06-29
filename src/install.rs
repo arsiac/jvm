@@ -219,7 +219,12 @@ pub fn install_jdk(opts: JdkInstallOpts) -> Result<()> {
         return Ok(());
     }
 
-    let parent = install_dir.parent().unwrap();
+    let parent = install_dir.parent().with_context(|| {
+        format!(
+            "cannot determine parent directory of {}",
+            install_dir.display()
+        )
+    })?;
     fs::create_dir_all(parent)?;
 
     let archive_path = parent.join(format!(".tmp_{semver}_{archive_name}"));
@@ -249,7 +254,13 @@ pub fn install_jdk(opts: JdkInstallOpts) -> Result<()> {
         }
     };
 
-    if jdk_home.parent().unwrap() != parent {
+    let jdk_parent = jdk_home.parent().with_context(|| {
+        format!(
+            "cannot determine parent directory of {}",
+            jdk_home.display()
+        )
+    })?;
+    if jdk_parent != parent {
         if let Err(e) = fs::rename(&jdk_home, &install_dir) {
             let _ = fs::remove_dir_all(&extract_tmp);
             return Err(e.into());
