@@ -131,12 +131,9 @@ fn build_client(proxy: Option<&str>) -> Result<reqwest::blocking::Client> {
         .connect_timeout(std::time::Duration::from_secs(30))
         .user_agent(concat!("jvm/", env!("CARGO_PKG_VERSION")));
     if let Some(proxy_url) = proxy {
-        match reqwest::Proxy::all(proxy_url) {
-            Ok(p) => builder = builder.proxy(p),
-            Err(e) => {
-                eprintln!("warning: ignoring invalid proxy URL '{proxy_url}': {e}");
-            }
-        }
+        let p = reqwest::Proxy::all(proxy_url)
+            .with_context(|| format!("invalid proxy URL: {proxy_url}"))?;
+        builder = builder.proxy(p);
     }
     Ok(builder.build()?)
 }
