@@ -164,6 +164,7 @@ pub fn heal_link() -> Result<()> {
     let entry = match config.find_by_version(version) {
         Some(e) => e.clone(),
         None => {
+            // eprintln to stderr so it doesn't pollute stdout when called from `jvm init`
             eprintln!(
                 "warning: current JDK '{}' not found in config, cannot restore symlink",
                 version
@@ -180,7 +181,17 @@ pub fn heal_link() -> Result<()> {
         )
     })?;
 
-    create_link(entry.path.as_ref(), &link)?;
+    let target_path = Path::new(&entry.path);
+    if !target_path.exists() {
+        // eprintln to stderr so it doesn't pollute stdout when called from `jvm init`
+        eprintln!(
+            "warning: JDK path '{}' does not exist, skipping symlink restore",
+            target_path.display()
+        );
+        return Ok(());
+    }
+
+    create_link(target_path, &link)?;
 
     Ok(())
 }
