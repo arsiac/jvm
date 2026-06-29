@@ -30,13 +30,35 @@ Sample output:
 ```
         Path                         Version   Aliases
   ---  ---------------------------  ---------  ---
-  *   /usr/lib/jvm/java-8-temurin  1.8.0_492  1.8, 1.8.0_492, 8
-      /usr/lib/jvm/java-25-temurin 25.0.3     25, 25.0, 25.0.3
+  *   /usr/lib/jvm/java-8-temurin  1.8.0_492  1.8, 8
+      /usr/lib/jvm/java-25-temurin 25.0.3     25
 ```
 
 The entry marked with `*` is the currently active JDK.
 
-### 3. Switch JDK
+### 3. Install a JDK
+
+Download and install a JDK distribution managed by jvm:
+
+```bash
+jvm install 21        # install latest JDK 21
+jvm install 21.0.2    # install specific version
+jvm install 21 --dist temurin --alias myjdk21
+```
+
+### 4. Uninstall a JDK
+
+Remove a managed JDK (deletes the installation directory and config entry):
+
+```bash
+jvm uninstall 21      # uninstall by alias
+jvm uninstall 21.0.2  # uninstall by full version
+jvm uninstall 21 --force  # force uninstall even if currently active
+```
+
+Note: `jvm uninstall` only works for JDKs installed via `jvm install`. For manually added JDKs, use `jvm remove`.
+
+### 5. Switch JDK
 
 ```bash
 jvm use 8         # switch by alias
@@ -44,7 +66,7 @@ jvm use 25        # switch by major version
 jvm use 25.0.3    # switch by full version
 ```
 
-### 4. Remove a JDK
+### 6. Remove a JDK
 
 Unregister a JDK by version, alias, or path. This only removes the registration, the JDK directory itself is not deleted.
 
@@ -57,7 +79,7 @@ jvm rm /usr/lib/jvm/java-8-temurin-jdk  # remove by path
 
 If the JDK is currently active, removal will be rejected — switch to another version first.
 
-### 5. Shell Integration
+### 7. Shell Integration
 
 Add the following line to your `.bashrc` or `.zshrc` so the JDK environment is set automatically on each shell startup:
 
@@ -80,7 +102,7 @@ jvm init powershell | Out-String | Invoke-Expression
 
 Add the line above to your PowerShell profile (`$PROFILE`) to make it permanent.
 
-### 6. Shell Completion
+### 8. Shell Completion
 
 Enable tab-completion for `jvm` commands:
 
@@ -110,11 +132,11 @@ jvm completion powershell | Out-String | Invoke-Expression
 
 | JDK Version | Auto-generated Aliases |
 |-------------|----------------------|
-| 1.8.0_492 | `1.8.0_492`, `1.8`, `8` |
-| 17.0.2 | `17.0.2`, `17.0`, `17` |
-| 25.0.3 | `25.0.3`, `25.0`, `25` |
+| 1.8.0_492 | `1.8`, `8` |
+| 17.0.2 | `17` |
+| 25.0.3 | `25` |
 
-Custom aliases can be added via the `--alias` flag during `jvm add`.
+Custom aliases can be added via the `--alias` flag during `jvm add` or `jvm install`.
 
 ## How It Works
 
@@ -124,6 +146,7 @@ Custom aliases can be added via the `--alias` flag during `jvm add`.
 |---------|---------------|---------|
 | Configuration (JDK metadata) | `${XDG_CONFIG_HOME:-$HOME/.config}/jvm/config.json` | `%APPDATA%\jvm\config.json` |
 | Runtime (current symlink) | `${XDG_RUNTIME_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}}/jvm/current` | `%APPDATA%\jvm\current` |
+| Managed JDKs | `~/.local/share/jvm/managed/` | `%APPDATA%\jvm\managed\` |
 
 All paths can be overridden by setting `$JVM_DIR` (works on all platforms).  
 The shell hook reads the `current` symlink/junction and sets `JAVA_HOME` and `PATH`.
