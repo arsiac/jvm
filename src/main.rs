@@ -477,6 +477,14 @@ fn cmd_info() -> Result<()> {
         ""
     );
     println!();
+    println!("   Managed JDKs:");
+    println!(
+        "     {:<12} {}",
+        "Location:",
+        dirs::display_path(&dirs::managed_dir())
+    );
+    println!("     {:<12} Installed JDK directories (via `jvm install`)", "Content:");
+    println!();
     println!("   \x1b[1mReset jvm completely:\x1b[0m");
     println!(
         "     rm -rf {}",
