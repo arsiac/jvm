@@ -331,9 +331,18 @@ fn cmd_list() -> Result<()> {
 
 fn cmd_remove(target: &str) -> Result<()> {
     let mut config = config::Config::load()?;
+    let entry = config
+        .find_by_version(target)
+        .ok_or_else(|| anyhow::anyhow!("no JDK found matching: {}", target))?
+        .clone();
     config.remove_jdk(target)?;
     config.save()?;
-    println!("Removed JDK: {}", target);
+    println!(
+        "Removed JDK {} ({}) at {}",
+        entry.full_version,
+        entry.aliases.join(", "),
+        entry.path
+    );
     Ok(())
 }
 
