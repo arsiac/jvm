@@ -119,10 +119,6 @@ impl Config {
             .find(|entry| entry.path == target || entry.path.ends_with(target))
     }
 
-    pub fn find_by_path(&self, path: &str) -> Option<&JdkEntry> {
-        self.jdks.iter().find(|e| e.path == path)
-    }
-
     pub fn remove_jdk(&mut self, version_or_path: &str) -> Result<()> {
         let pos = self
             .jdks

@@ -132,11 +132,7 @@ enum Commands {
     /// Uninstall a JDK distribution (removes files + config entry)
     Uninstall {
         /// JDK version or alias to uninstall
-        target: Option<String>,
-
-        /// Uninstall by path
-        #[arg(long)]
-        path: Option<String>,
+        target: String,
 
         /// Force uninstall even if currently in use
         #[arg(long, short)]
@@ -643,31 +639,13 @@ fn cmd_install(
     Ok(())
 }
 
-fn cmd_uninstall(target: Option<&str>, path: Option<&str>, force: bool) -> Result<()> {
-    match (target, path) {
-        (None, None) => anyhow::bail!("specify a JDK version/alias or --path to uninstall"),
-        (Some(_), Some(_)) => anyhow::bail!("specify either a version/alias or --path, not both"),
-        _ => {}
-    }
-
+fn cmd_uninstall(target: &str, force: bool) -> Result<()> {
     let mut config = config::Config::load()?;
 
-    let entry = match target {
-        Some(t) => config
-            .find_by_version(t)
-            .ok_or_else(|| anyhow::anyhow!("no JDK found matching: {t}"))?
-            .clone(),
-        None => {
-            let p = path.unwrap();
-            let canonical = Path::new(p).canonicalize()?;
-            let p_str = canonical.to_string_lossy().to_string();
-            config
-                .find_by_path(&p_str)
-                .or_else(|| config.find_by_path(p))
-                .ok_or_else(|| anyhow::anyhow!("no JDK found at path: {p}"))?
-                .clone()
-        }
-    };
+    let entry = config
+        .find_by_version(target)
+        .ok_or_else(|| anyhow::anyhow!("no JDK found matching: {target}"))?
+        .clone();
 
     if config.current.as_deref() == Some(&entry.full_version) {
         if !force {
@@ -681,6 +659,16 @@ fn cmd_uninstall(target: Option<&str>, path: Option<&str>, force: bool) -> Resul
     }
 
     let jdk_path = Path::new(&entry.path);
+    let managed = dirs::managed_dir();
+    let is_managed = jdk_path.starts_with(&managed);
+
+    if !is_managed {
+        anyhow::bail!(
+            "JDK at {} is not managed by jvm. Use `jvm remove` to unregister it instead.",
+            entry.path
+        );
+    }
+
     if jdk_path.exists() {
         std::fs::remove_dir_all(jdk_path)?;
     }
@@ -732,11 +720,7 @@ fn main() -> Result<()> {
             list,
             dry_run,
         )?,
-        Commands::Uninstall {
-            target,
-            path,
-            force,
-        } => cmd_uninstall(target.as_deref(), path.as_deref(), force)?,
+        Commands::Uninstall { target, force } => cmd_uninstall(&target, force)?,
     }
 
     Ok(())
