@@ -43,6 +43,7 @@ enum Commands {
     },
 
     /// List all registered JDK installations
+    #[command(visible_alias = "ls")]
     List,
 
     /// Generate shell hook script
