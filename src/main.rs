@@ -2,13 +2,12 @@ mod completion;
 mod config;
 mod dirs;
 mod init;
+mod install;
 mod jdk;
 mod switch;
 
 use std::env;
-use std::path::Path;
-#[cfg(windows)]
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand};
@@ -99,6 +98,50 @@ enum Commands {
     /// Manage JDK aliases
     #[command(subcommand)]
     Alias(AliasCommands),
+
+    /// Download and install a JDK distribution
+    Install {
+        /// JDK version to install (e.g., "21" or "21.0.1")
+        version: Option<String>,
+
+        /// Distribution source (temurin)
+        #[arg(long, short, default_value = "temurin")]
+        dist: String,
+
+        /// Custom install path (overrides managed directory)
+        #[arg(long, short)]
+        path: Option<String>,
+
+        /// Proxy URL (e.g., http://127.0.0.1:7890)
+        #[arg(long)]
+        proxy: Option<String>,
+
+        /// Add custom alias(es)
+        #[arg(long)]
+        alias: Vec<String>,
+
+        /// List available versions instead of installing
+        #[arg(long, short)]
+        list: bool,
+
+        /// Preview download without downloading
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Uninstall a JDK distribution (removes files + config entry)
+    Uninstall {
+        /// JDK version or alias to uninstall
+        target: Option<String>,
+
+        /// Uninstall by path
+        #[arg(long)]
+        path: Option<String>,
+
+        /// Force uninstall even if currently in use
+        #[arg(long, short)]
+        force: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -208,10 +251,7 @@ fn cmd_exec(target: &str, command: &[String]) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("JDK not found: {}", target))?;
 
     let jdk_path = Path::new(&entry.path);
-    let jdk_bin = jdk::java_bin_path(jdk_path)
-        .parent()
-        .unwrap()
-        .to_path_buf();
+    let jdk_bin = jdk::java_bin_path(jdk_path).parent().unwrap().to_path_buf();
 
     let mut path_entries = Vec::new();
     path_entries.push(jdk_bin.as_os_str().to_os_string());
@@ -572,6 +612,90 @@ fn update_single_entry(config: &mut config::Config, idx: usize) -> Result<()> {
     Ok(())
 }
 
+fn cmd_install(
+    version: Option<&str>,
+    dist: &str,
+    path: Option<&str>,
+    proxy: Option<&str>,
+    aliases: &[String],
+    list: bool,
+    dry_run: bool,
+) -> Result<()> {
+    let dist_source: install::DistSource = dist.parse().map_err(|e| anyhow::anyhow!("{}", e))?;
+
+    let opts = install::JdkInstallOpts {
+        version: version.map(|s| s.to_string()),
+        dist: dist_source,
+        install_path: path.map(PathBuf::from),
+        proxy: install::resolve_proxy(proxy),
+        aliases: aliases.to_vec(),
+        dry_run,
+    };
+
+    if list {
+        install::list_versions(&opts)?;
+    } else if version.is_none() {
+        anyhow::bail!("a version is required to install. Use --list to see available versions.");
+    } else {
+        install::install_jdk(opts)?;
+    }
+
+    Ok(())
+}
+
+fn cmd_uninstall(target: Option<&str>, path: Option<&str>, force: bool) -> Result<()> {
+    match (target, path) {
+        (None, None) => anyhow::bail!("specify a JDK version/alias or --path to uninstall"),
+        (Some(_), Some(_)) => anyhow::bail!("specify either a version/alias or --path, not both"),
+        _ => {}
+    }
+
+    let mut config = config::Config::load()?;
+
+    let entry = match target {
+        Some(t) => config
+            .find_by_version(t)
+            .ok_or_else(|| anyhow::anyhow!("no JDK found matching: {t}"))?
+            .clone(),
+        None => {
+            let p = path.unwrap();
+            let canonical = Path::new(p).canonicalize()?;
+            let p_str = canonical.to_string_lossy().to_string();
+            config
+                .find_by_path(&p_str)
+                .or_else(|| config.find_by_path(p))
+                .ok_or_else(|| anyhow::anyhow!("no JDK found at path: {p}"))?
+                .clone()
+        }
+    };
+
+    if config.current.as_deref() == Some(&entry.full_version) {
+        if !force {
+            anyhow::bail!(
+                "JDK {} is currently in use, switch to another version first or use --force",
+                entry.full_version
+            );
+        }
+        config.current = None;
+        let _ = std::fs::remove_file(dirs::current_link_path());
+    }
+
+    let jdk_path = Path::new(&entry.path);
+    if jdk_path.exists() {
+        std::fs::remove_dir_all(jdk_path)?;
+    }
+
+    config.remove_jdk(&entry.full_version)?;
+    config.save()?;
+
+    println!(
+        "Uninstalled JDK {} (removed {})",
+        entry.full_version,
+        jdk_path.display()
+    );
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -591,6 +715,28 @@ fn main() -> Result<()> {
             AliasCommands::Add { target, alias } => cmd_alias_add(&target, &alias)?,
             AliasCommands::Remove { target, alias } => cmd_alias_remove(&target, &alias)?,
         },
+        Commands::Install {
+            version,
+            dist,
+            path,
+            proxy,
+            alias,
+            list,
+            dry_run,
+        } => cmd_install(
+            version.as_deref(),
+            &dist,
+            path.as_deref(),
+            proxy.as_deref(),
+            &alias,
+            list,
+            dry_run,
+        )?,
+        Commands::Uninstall {
+            target,
+            path,
+            force,
+        } => cmd_uninstall(target.as_deref(), path.as_deref(), force)?,
     }
 
     Ok(())

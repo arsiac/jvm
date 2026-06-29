@@ -308,7 +308,6 @@ fn test_completions_alias() {
     assert!(stdout.contains("_jvm"));
 }
 
-
 #[test]
 fn test_alias_add_and_remove() {
     let tmp = tempfile::TempDir::new().unwrap();

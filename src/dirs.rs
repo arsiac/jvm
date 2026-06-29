@@ -44,6 +44,25 @@ pub fn runtime_dir() -> PathBuf {
     config_dir()
 }
 
+/// Directory where jvm-managed JDK installations live.
+///
+/// ~/.local/share/jvm/managed/ (Linux)
+/// ~/Library/Application Support/jvm/managed/ (macOS)
+/// %APPDATA%/jvm/managed/ (Windows)
+///
+/// Override via `$JVM_DIR/managed/`.
+pub fn managed_dir() -> PathBuf {
+    if let Ok(val) = env::var("JVM_DIR") {
+        return PathBuf::from(val).join("managed");
+    }
+    let base = dirs::data_dir().unwrap_or_else(|| {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("/"))
+            .join(".local/share")
+    });
+    base.join("jvm").join("managed")
+}
+
 /// Full path to the `current` symlink.
 pub fn current_link_path() -> PathBuf {
     runtime_dir().join("current")
@@ -117,6 +136,25 @@ mod tests {
         let path = current_link_path();
         assert_eq!(path, PathBuf::from("/tmp/test-jvm/current"));
         env::remove_var("JVM_DIR");
+    }
+
+    // --- managed_dir ---
+
+    #[test]
+    #[serial]
+    fn test_managed_dir_with_jvm_dir() {
+        env::set_var("JVM_DIR", "/custom/jvm");
+        let dir = managed_dir();
+        assert_eq!(dir, PathBuf::from("/custom/jvm/managed"));
+        env::remove_var("JVM_DIR");
+    }
+
+    #[test]
+    #[serial]
+    fn test_managed_dir_default() {
+        env::remove_var("JVM_DIR");
+        let dir = managed_dir();
+        assert!(dir.ends_with("jvm/managed"));
     }
 
     // --- display_path ---

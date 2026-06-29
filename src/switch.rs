@@ -166,8 +166,12 @@ pub fn heal_link() -> Result<()> {
     };
 
     let runtime_dir = dirs::runtime_dir();
-    fs::create_dir_all(&runtime_dir)
-        .with_context(|| format!("failed to create runtime directory: {}", runtime_dir.display()))?;
+    fs::create_dir_all(&runtime_dir).with_context(|| {
+        format!(
+            "failed to create runtime directory: {}",
+            runtime_dir.display()
+        )
+    })?;
 
     create_link(entry.path.as_ref(), &link)?;
 
