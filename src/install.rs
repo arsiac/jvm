@@ -160,7 +160,7 @@ pub fn list_versions(opts: &JdkInstallOpts) -> Result<()> {
         Some(ver) => {
             let major: i32 = match ver.parse() {
                 Ok(v) => v,
-                Err(_) => bail!("invalid major version: {ver}"),
+                Err(_) => bail!("expected a major version number (e.g. 21), got: {ver}"),
             };
             let url = format!(
                 "{}/assets/feature_releases/{major}/ga?architecture={}&image_type=jdk&os={}&project=jdk&vendor={}&sort_method=DEFAULT&sort_order=DESC&page=0&page_size=20",
