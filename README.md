@@ -28,10 +28,9 @@ jvm list
 Sample output:
 
 ```
-        Path                         Version   Aliases
-  ---  ---------------------------  ---------  ---
-  *   /usr/lib/jvm/java-8-temurin  1.8.0_492  1.8, 8
-      /usr/lib/jvm/java-25-temurin 25.0.3     25
+      Version       Aliases   Path
+  *   1.8.0_492     1.8, 8    /usr/lib/jvm/java-8-temurin
+      25.0.3        25        /usr/lib/jvm/java-25-temurin
 ```
 
 The entry marked with `*` is the currently active JDK.
@@ -107,23 +106,29 @@ Add the line above to your PowerShell profile (`$PROFILE`) to make it permanent.
 Enable tab-completion for `jvm` commands:
 
 **bash**:
+
 ```bash
 source <(jvm completion bash)
 ```
+
 Add the line above to your `~/.bashrc` to make it permanent.
 
 **zsh**:
+
 ```zsh
 source <(jvm completion zsh)
 ```
+
 Add the line above to your `~/.zshrc` to make it permanent.
 
 **fish**:
+
 ```fish
 jvm completion fish | source
 ```
 
 **PowerShell**:
+
 ```powershell
 jvm completion powershell | Out-String | Invoke-Expression
 ```
@@ -131,10 +136,10 @@ jvm completion powershell | Out-String | Invoke-Expression
 ## Alias Rules
 
 | JDK Version | Auto-generated Aliases |
-|-------------|----------------------|
-| 1.8.0_492 | `1.8`, `8` |
-| 17.0.2 | `17` |
-| 25.0.3 | `25` |
+| ----------- | ---------------------- |
+| 1.8.0_492   | `1.8`, `8`             |
+| 17.0.2      | `17`                   |
+| 25.0.3      | `25`                   |
 
 Custom aliases can be added via the `--alias` flag during `jvm add` or `jvm install`.
 
@@ -142,11 +147,11 @@ Custom aliases can be added via the `--alias` flag during `jvm add` or `jvm inst
 
 ### Directory Layout
 
-| Purpose | Linux / macOS | Windows |
-|---------|---------------|---------|
-| Configuration (JDK metadata) | `${XDG_CONFIG_HOME:-$HOME/.config}/jvm/config.json` | `%APPDATA%\jvm\config.json` |
-| Runtime (current symlink) | `${XDG_RUNTIME_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}}/jvm/current` | `%APPDATA%\jvm\current` |
-| Managed JDKs | `~/.local/share/jvm/managed/` | `%APPDATA%\jvm\managed\` |
+| Purpose                      | Linux / macOS                                                          | Windows                     |
+| ---------------------------- | ---------------------------------------------------------------------- | --------------------------- |
+| Configuration (JDK metadata) | `${XDG_CONFIG_HOME:-$HOME/.config}/jvm/config.json`                    | `%APPDATA%\jvm\config.json` |
+| Runtime (current symlink)    | `${XDG_RUNTIME_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}}/jvm/current` | `%APPDATA%\jvm\current`     |
+| Managed JDKs                 | `~/.local/share/jvm/managed/`                                          | `%APPDATA%\jvm\managed\`    |
 
 All paths can be overridden by setting `$JVM_DIR` (works on all platforms).  
 The shell hook reads the `current` symlink/junction and sets `JAVA_HOME` and `PATH`.

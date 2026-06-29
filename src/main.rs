@@ -301,9 +301,9 @@ fn cmd_list() -> Result<()> {
     table.load_preset(presets::NOTHING);
     table.set_header(vec![
         Cell::new("").add_attribute(Attribute::Bold),
-        Cell::new("Path").add_attribute(Attribute::Bold),
         Cell::new("Version").add_attribute(Attribute::Bold),
         Cell::new("Aliases").add_attribute(Attribute::Bold),
+        Cell::new("Path").add_attribute(Attribute::Bold),
     ]);
 
     for entry in &config.jdks {
@@ -319,9 +319,9 @@ fn cmd_list() -> Result<()> {
 
         table.add_row(vec![
             Cell::new(marker),
-            Cell::new(dirs::display_path(entry.path.as_ref())),
             version,
             Cell::new(entry.aliases.join(", ")),
+            Cell::new(dirs::display_path(entry.path.as_ref())),
         ]);
     }
 
@@ -483,7 +483,10 @@ fn cmd_info() -> Result<()> {
         "Location:",
         dirs::display_path(&dirs::managed_dir())
     );
-    println!("     {:<12} Installed JDK directories (via `jvm install`)", "Content:");
+    println!(
+        "     {:<12} Installed JDK directories (via `jvm install`)",
+        "Content:"
+    );
     println!();
     println!("   \x1b[1mReset jvm completely:\x1b[0m");
     println!(
