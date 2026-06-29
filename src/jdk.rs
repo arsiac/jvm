@@ -79,17 +79,13 @@ pub fn detect_version(jdk_path: &Path) -> Result<String> {
 
 pub fn generate_aliases(full_version: &str) -> Vec<String> {
     let mut aliases = Vec::new();
-    aliases.push(full_version.to_string());
 
     let parts: Vec<&str> = full_version.splitn(3, '.').collect();
     if parts.len() >= 2 {
-        let major_minor = format!("{}.{}", parts[0], parts[1]);
-        if major_minor != full_version {
-            aliases.push(major_minor);
-        }
-
         if parts[0] == "1" && parts.len() >= 3 {
             let second = parts[1];
+            let major_minor = format!("{}.{}", parts[0], second);
+            aliases.push(major_minor);
             if let Ok(parsed) = second.parse::<u32>() {
                 aliases.push(parsed.to_string());
             }
@@ -113,74 +109,76 @@ mod tests {
     // --- generate_aliases ---
 
     #[test]
+    fn test_java5_aliases() {
+        let aliases = generate_aliases("1.5.0");
+        assert!(aliases.contains(&"1.5".to_string()));
+        assert!(aliases.contains(&"5".to_string()));
+        assert_eq!(aliases.len(), 2);
+    }
+
+    #[test]
     fn test_java8_aliases() {
         let aliases = generate_aliases("1.8.0_492");
-        assert!(aliases.contains(&"1.8.0_492".to_string()));
         assert!(aliases.contains(&"1.8".to_string()));
         assert!(aliases.contains(&"8".to_string()));
+        assert_eq!(aliases.len(), 2);
     }
 
     #[test]
     fn test_java17_aliases() {
         let aliases = generate_aliases("17.0.2");
-        assert!(aliases.contains(&"17.0.2".to_string()));
-        assert!(aliases.contains(&"17.0".to_string()));
-        assert!(aliases.contains(&"17".to_string()));
-    }
-
-    #[test]
-    fn test_java11_aliases() {
-        let aliases = generate_aliases("11.0.1");
-        assert!(aliases.contains(&"11.0.1".to_string()));
-        assert!(aliases.contains(&"11.0".to_string()));
-        assert!(aliases.contains(&"11".to_string()));
-    }
-
-    #[test]
-    fn test_java6_aliases() {
-        let aliases = generate_aliases("1.6.0_45");
-        assert!(aliases.contains(&"1.6.0_45".to_string()));
-        assert!(aliases.contains(&"1.6".to_string()));
-        assert!(aliases.contains(&"6".to_string()));
-    }
-
-    #[test]
-    fn test_java21_aliases() {
-        let aliases = generate_aliases("21.0.5");
-        assert!(aliases.contains(&"21.0.5".to_string()));
-        assert!(aliases.contains(&"21.0".to_string()));
-        assert!(aliases.contains(&"21".to_string()));
-    }
-
-    #[test]
-    fn test_java25_aliases() {
-        let aliases = generate_aliases("25.0.3");
-        assert!(aliases.contains(&"25.0.3".to_string()));
-        assert!(aliases.contains(&"25.0".to_string()));
-        assert!(aliases.contains(&"25".to_string()));
-    }
-
-    #[test]
-    fn test_major_only_version() {
-        let aliases = generate_aliases("17");
         assert!(aliases.contains(&"17".to_string()));
         assert_eq!(aliases.len(), 1);
     }
 
     #[test]
+    fn test_java11_aliases() {
+        let aliases = generate_aliases("11.0.1");
+        assert!(aliases.contains(&"11".to_string()));
+        assert_eq!(aliases.len(), 1);
+    }
+
+    #[test]
+    fn test_java6_aliases() {
+        let aliases = generate_aliases("1.6.0_45");
+        assert!(aliases.contains(&"1.6".to_string()));
+        assert!(aliases.contains(&"6".to_string()));
+        assert_eq!(aliases.len(), 2);
+    }
+
+    #[test]
+    fn test_java21_aliases() {
+        let aliases = generate_aliases("21.0.5");
+        assert!(aliases.contains(&"21".to_string()));
+        assert_eq!(aliases.len(), 1);
+    }
+
+    #[test]
+    fn test_java25_aliases() {
+        let aliases = generate_aliases("25.0.3");
+        assert!(aliases.contains(&"25".to_string()));
+        assert_eq!(aliases.len(), 1);
+    }
+
+    #[test]
+    fn test_major_only_version() {
+        let aliases = generate_aliases("17");
+        assert_eq!(aliases.len(), 0);
+    }
+
+    #[test]
     fn test_major_minor_only_version() {
         let aliases = generate_aliases("17.0");
-        assert!(aliases.contains(&"17.0".to_string()));
-        assert_eq!(aliases.len(), 2);
         assert!(aliases.contains(&"17".to_string()));
+        assert_eq!(aliases.len(), 1);
     }
 
     #[test]
     fn test_java8_no_update() {
         let aliases = generate_aliases("1.8.0");
-        assert!(aliases.contains(&"1.8.0".to_string()));
         assert!(aliases.contains(&"1.8".to_string()));
         assert!(aliases.contains(&"8".to_string()));
+        assert_eq!(aliases.len(), 2);
     }
 
     #[test]
