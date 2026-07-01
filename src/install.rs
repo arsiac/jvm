@@ -12,6 +12,33 @@ use crate::config;
 use crate::dirs;
 use crate::jdk::{self, JdkInfo};
 
+#[derive(Debug)]
+struct VersionInfo {
+    semver: String,
+    download_url: String,
+    archive_name: String,
+    size_hint: Option<i64>,
+    checksum: Option<String>,
+}
+
+impl VersionInfo {
+    fn new(
+        semver: String,
+        download_url: String,
+        archive_name: String,
+        size_hint: Option<i64>,
+        checksum: Option<String>,
+    ) -> Self {
+        Self {
+            semver,
+            download_url,
+            archive_name,
+            size_hint,
+            checksum,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DistSource {
     Temurin,
@@ -79,6 +106,7 @@ struct Package {
     link: String,
     name: String,
     size: Option<i64>,
+    checksum: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -187,9 +215,7 @@ pub fn list_versions(opts: &JdkInstallOpts) -> Result<()> {
 
 pub fn install_jdk(opts: JdkInstallOpts) -> Result<()> {
     let proxy = opts.proxy.as_deref();
-
-    let (semver, download_url, archive_name, size_hint) = resolve_version(&opts, proxy)?;
-
+    let info = resolve_version(&opts, proxy)?;
     let install_dir = match &opts.install_path {
         Some(p) => {
             let p = PathBuf::from(p);
@@ -199,22 +225,26 @@ pub fn install_jdk(opts: JdkInstallOpts) -> Result<()> {
                 env::current_dir()?.join(p)
             }
         }
-        None => dirs::managed_dir().join(format!("jdk-{semver}")),
+        None => dirs::managed_dir().join(format!("jdk-{}", &info.semver)),
     };
 
     if !opts.dry_run && install_dir.exists() {
         bail!(
-            "JDK {semver} already installed at {}",
+            "JDK {} already installed at {}",
+            &info.semver,
             install_dir.display()
         );
     }
 
     if opts.dry_run {
         println!("Distribution:  {}", opts.dist.name());
-        println!("Version:       {semver}");
-        println!("Archive:       {archive_name}");
-        println!("Size:          {}", format_size(size_hint.unwrap_or(0)));
-        println!("Download URL:  {download_url}");
+        println!("Version:       {}", &info.semver);
+        println!("Archive:       {}", &info.archive_name);
+        println!(
+            "Size:          {}",
+            format_size(info.size_hint.unwrap_or(0))
+        );
+        println!("Download URL:  {}", &info.download_url);
         println!("Install path:  {}", install_dir.display());
         return Ok(());
     }
@@ -227,13 +257,22 @@ pub fn install_jdk(opts: JdkInstallOpts) -> Result<()> {
     })?;
     fs::create_dir_all(parent)?;
 
-    let archive_path = parent.join(format!(".tmp_{semver}_{archive_name}"));
-    if let Err(e) = download_file(&download_url, &archive_path, proxy) {
+    let archive_path = parent.join(format!(".tmp_{}_{}", &info.semver, &info.archive_name));
+    if let Err(e) = download_file(&info.download_url, &archive_path, proxy) {
         let _ = fs::remove_file(&archive_path);
         return Err(e);
     }
 
-    let extract_tmp = parent.join(format!(".tmp_extract_{semver}"));
+    if let Some(expected) = &info.checksum {
+        verify_checksum(&archive_path, expected)?;
+    } else {
+        eprintln!(
+            "Warning: no checksum available for {}, skipping integrity verification",
+            &info.archive_name
+        );
+    }
+
+    let extract_tmp = parent.join(format!(".tmp_extract_{}", &info.semver));
     if extract_tmp.exists() {
         fs::remove_dir_all(&extract_tmp)?;
     }
@@ -297,10 +336,7 @@ pub fn install_jdk(opts: JdkInstallOpts) -> Result<()> {
     Ok(())
 }
 
-fn resolve_version(
-    opts: &JdkInstallOpts,
-    proxy: Option<&str>,
-) -> Result<(String, String, String, Option<i64>)> {
+fn resolve_version(opts: &JdkInstallOpts, proxy: Option<&str>) -> Result<VersionInfo> {
     let client = build_client(proxy)?;
     let version_input = opts.version.as_deref().unwrap_or_default();
 
@@ -349,11 +385,12 @@ fn resolve_version(
 
     let semver = release.version_data.semver.clone();
     let bin = &release.binaries[0];
-    Ok((
+    Ok(VersionInfo::new(
         semver,
         bin.pkg.link.clone(),
         bin.pkg.name.clone(),
         bin.pkg.size,
+        bin.pkg.checksum.clone(),
     ))
 }
 
@@ -388,6 +425,35 @@ fn download_file(url: &str, dest: &Path, proxy: Option<&str>) -> Result<()> {
     }
 
     pb.finish_and_clear();
+    Ok(())
+}
+
+fn verify_checksum(path: &Path, expected: &str) -> Result<()> {
+    use sha2::Digest;
+
+    let mut file = fs::File::open(path).with_context(|| {
+        format!(
+            "failed to open {} for checksum verification",
+            path.display()
+        )
+    })?;
+    let mut hasher = sha2::Sha256::new();
+    let mut buf = [0u8; 8192];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+    let actual = hex::encode(hasher.finalize());
+
+    if !actual.eq_ignore_ascii_case(expected) {
+        bail!(
+            "checksum mismatch for {}:\n  expected: {expected}\n  actual:   {actual}",
+            path.display()
+        );
+    }
     Ok(())
 }
 
@@ -508,5 +574,29 @@ mod tests {
         assert!(["linux", "mac", "windows"].contains(&os));
         let arch = current_arch();
         assert!(["x64", "aarch64", "arm"].contains(&arch));
+    }
+
+    #[test]
+    fn test_verify_checksum_valid() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("empty.bin");
+        fs::write(&file_path, b"").unwrap();
+        assert!(verify_checksum(
+            &file_path,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn test_verify_checksum_mismatch() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("data.bin");
+        fs::write(&file_path, b"hello").unwrap();
+        assert!(verify_checksum(
+            &file_path,
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        )
+        .is_err());
     }
 }
