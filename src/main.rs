@@ -86,6 +86,12 @@ enum Commands {
         target: Option<String>,
     },
 
+    /// Print shell commands to set JAVA_HOME and PATH for a JDK
+    Env {
+        /// JDK version, alias, or path (defaults to current active JDK)
+        target: Option<String>,
+    },
+
     /// Run a command using a specific JDK without switching
     Exec {
         /// JDK version, alias, or path
@@ -236,6 +242,37 @@ fn cmd_which(target: Option<&str>) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("JDK not found: {}", version))?;
 
     println!("{}", entry.path);
+    Ok(())
+}
+
+fn cmd_env(target: Option<&str>) -> Result<()> {
+    let config = config::Config::load()?;
+
+    let version = match target {
+        Some(t) => t.to_string(),
+        None => match &config.current {
+            Some(v) => v.clone(),
+            None if config.jdks.is_empty() => {
+                anyhow::bail!("No JDK has been added yet")
+            }
+            None => {
+                anyhow::bail!("No JDK is currently active")
+            }
+        },
+    };
+
+    let entry = config
+        .find_by_version(&version)
+        .ok_or_else(|| anyhow::anyhow!("JDK not found: {}", version))?;
+
+    let jdk_path = &entry.path;
+    let bin_path = std::path::Path::new(jdk_path).join("bin");
+
+    println!(
+        "export JAVA_HOME={}; export PATH={}:$PATH",
+        jdk_path,
+        bin_path.display()
+    );
     Ok(())
 }
 
@@ -718,6 +755,7 @@ fn main() -> Result<()> {
         Commands::Info => cmd_info()?,
         Commands::Update { target, all } => cmd_update(&target, all)?,
         Commands::Which { target } => cmd_which(target.as_deref())?,
+        Commands::Env { target } => cmd_env(target.as_deref())?,
         Commands::Exec { target, command } => cmd_exec(&target, &command)?,
         Commands::Alias(cmd) => match cmd {
             AliasCommands::Add { target, alias } => cmd_alias_add(&target, &alias)?,
