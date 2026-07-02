@@ -455,7 +455,10 @@ fn download_file(url: &str, dest: &Path, proxy: Option<&str>) -> Result<()> {
         "Downloading {}",
         dest.file_name().unwrap_or_default().to_string_lossy()
     ));
-    pb.set_position(progress_start);
+    if progress_start > 0 {
+        pb.set_position(progress_start);
+        pb.reset_elapsed();
+    }
 
     let mut downloaded = progress_start;
     let mut buf = [0u8; 65536];
