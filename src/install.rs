@@ -258,13 +258,15 @@ pub fn install_jdk(opts: JdkInstallOpts) -> Result<()> {
     fs::create_dir_all(parent)?;
 
     let archive_path = parent.join(format!(".tmp_{}_{}", &info.semver, &info.archive_name));
-    if let Err(e) = download_file(&info.download_url, &archive_path, proxy) {
-        let _ = fs::remove_file(&archive_path);
-        return Err(e);
-    }
+    // Keep partial file for resume on retry.
+    download_file(&info.download_url, &archive_path, proxy)?;
 
     if let Some(expected) = &info.checksum {
-        verify_checksum(&archive_path, expected)?;
+        if let Err(e) = verify_checksum(&archive_path, expected) {
+            // File is corrupt — remove so next attempt starts fresh.
+            let _ = fs::remove_file(&archive_path);
+            return Err(e);
+        }
     } else {
         eprintln!(
             "Warning: no checksum available for {}, skipping integrity verification",
@@ -278,7 +280,7 @@ pub fn install_jdk(opts: JdkInstallOpts) -> Result<()> {
     }
     fs::create_dir_all(&extract_tmp)?;
     if let Err(e) = extract_archive(&archive_path, &extract_tmp) {
-        let _ = fs::remove_file(&archive_path);
+        // Keep partial archive for resume on retry; remove failed extraction dir.
         let _ = fs::remove_dir_all(&extract_tmp);
         return Err(e);
     }
@@ -394,10 +396,54 @@ fn resolve_version(opts: &JdkInstallOpts, proxy: Option<&str>) -> Result<Version
     ))
 }
 
+/// Parse total content size from `Content-Range: bytes start-end/total` header.
+fn parse_content_size_from_range(resp: &reqwest::blocking::Response) -> Option<u64> {
+    let val = resp.headers().get(reqwest::header::CONTENT_RANGE)?;
+    let val_str = val.to_str().ok()?;
+    let total = val_str.split('/').nth(1)?;
+    total.parse::<u64>().ok()
+}
+
 fn download_file(url: &str, dest: &Path, proxy: Option<&str>) -> Result<()> {
     let client = build_client(proxy)?;
-    let mut resp = client.get(url).send()?;
-    let total = resp.content_length().unwrap_or(0);
+
+    let existing_size = dest.metadata().map(|m| m.len()).unwrap_or(0);
+
+    let mut req = client.get(url);
+    if existing_size > 0 {
+        req = req.header(reqwest::header::RANGE, format!("bytes={}-", existing_size));
+    }
+
+    let mut resp = req.send()?;
+    let status = resp.status();
+
+    // Server says the range is invalid — file is likely already complete.
+    if status == reqwest::StatusCode::RANGE_NOT_SATISFIABLE {
+        return Ok(());
+    }
+
+    let (mut file, progress_start, total) = if status == reqwest::StatusCode::PARTIAL_CONTENT {
+        // Resume: append to existing partial file.
+        let total = parse_content_size_from_range(&resp)
+            .or_else(|| resp.content_length().map(|l| l + existing_size))
+            .unwrap_or(0);
+        let file = fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(dest)?;
+        (file, existing_size, total)
+    } else if status == reqwest::StatusCode::OK && existing_size > 0 {
+        // Server does not support Range; start over.
+        eprintln!("Server does not support resume, re-downloading from start");
+        let total = resp.content_length().unwrap_or(0);
+        let file = fs::File::create(dest)?;
+        (file, 0, total)
+    } else {
+        // Fresh download.
+        let total = resp.content_length().unwrap_or(0);
+        let file = fs::File::create(dest)?;
+        (file, 0, total)
+    };
 
     let pb = ProgressBar::new(total);
     pb.set_style(
@@ -409,9 +455,9 @@ fn download_file(url: &str, dest: &Path, proxy: Option<&str>) -> Result<()> {
         "Downloading {}",
         dest.file_name().unwrap_or_default().to_string_lossy()
     ));
+    pb.set_position(progress_start);
 
-    let mut file = fs::File::create(dest)?;
-    let mut downloaded = 0u64;
+    let mut downloaded = progress_start;
     let mut buf = [0u8; 65536];
 
     loop {
